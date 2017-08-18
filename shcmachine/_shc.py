@@ -5,6 +5,7 @@ Spyder Editor
 This is a temporary script file.
 """
 import numpy as _np
+import pandas as _pd
 from scipy.special import expit
 
 @_np.vectorize
@@ -75,6 +76,10 @@ class SHC():
         if self.numStates != oldcount or reset: #force reset if number of states change
             self.statevector = _np.zeros((numStates))
             self.statevector[0] = self.beta[0] #start at state 0
+            #columnnames = ["S{0}".format(i) for i in range(self.numStates)]
+            self.statehistory = _np.empty((1000000, self.numStates+1))
+            self.statehistory.fill(_np.nan)
+            self.historyIndex = -1
 
     def updatePredecessors(self, listoflist):
         self.predecessors=listoflist
@@ -116,7 +121,18 @@ class SHC():
                 rho[state, predecessor] = (self.alpha[state] - (self.alpha[predecessor]/self.nu[predecessor])) * self.betaInv[predecessor]
         self.rho = rho
      
-        
+    def _recordState(self):
+            self.historyIndex = self.historyIndex + 1
+            if self.statehistory.shape[0] < self.historyIndex:
+                print("(doubling history buffer)")
+                self.statehistory.append(_np.empty(self.statehistory.shape)) #double array size
+            self.statehistory[self.historyIndex, 0] = self.t
+            self.statehistory[self.historyIndex, 1:self.numStates+1] = self.statevector
+
+    def getStateHistory(self):
+             return  self.statehistory[:self.historyIndex,:]
+         
+            
     def step(self):
             """
             Euler-Maruyama integration scheme
@@ -143,6 +159,5 @@ class SHC():
             self.statevector = _np.maximum(self.statevector + self.dotstatevector*dt , 0) #set the new state and also ensure nonegativity
 
             self.t = self.t + dt
-            normalized_states = self.betaInv * self.statevector
-            return normalized_states**1.0
-       
+            self._recordState()
+            return self.statevector       

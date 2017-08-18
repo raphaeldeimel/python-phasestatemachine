@@ -20,14 +20,18 @@ shc.setParameters(
     predecessors = [[2],[0],[1],[2]], # loop wiht 3 states, and one temrinal state (3) reachable from (2)
     )         
 
-shc.updateTransitionTriggerInput([1e-9,0,0,-3e-10]) #
+shc.updateTransitionTriggerInput([1e-9,0,0,-50e-4]) #
+[shc.step() for i in range(1000)]
+shc.updateTransitionTriggerInput([-1e-6,0,0, 50e-4]) #
+[shc.step() for i in range(1000)]
 
-states = _np.vstack([shc.step() for i in range(1000)])
+
+states = shc.getStateHistory()
 
 import matplotlib.pylab as plt
 fig =plt.figure(figsize=(18,3))
-for i in range(states.shape[1]):
-    plt.plot( -1.0*i + states[:,i], color='b')   
+for i in range(1, shc.numStates+1):
+    plt.plot( states[:,0], -1.0*i + states[:,i], color='b')   
     
 def plotfunc(func):
     x= _np.linspace(-3., 3.0, 500)
