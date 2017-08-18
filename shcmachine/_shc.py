@@ -5,7 +5,6 @@ Spyder Editor
 This is a temporary script file.
 """
 import numpy as _np
-from scipy.integrate import ode as _ode
 from scipy.special import expit
 
 @_np.vectorize
@@ -21,20 +20,41 @@ def _limitFunction2(x):
 
 def _limitFunction(x):
         """
-        limits positive values
+        limits transition velocity
         """
         return 2*(expit(2*x)-0.5)
 
+
 class SHC():
+    """
+    This class encapsulates a dynamical system that can behave state-like like a classical determinisitic automaton
+    The transitions though are smooth, which enables a continuous synchronization of motion during such a transition
+    
+    The most important parameters are:
+        
+        numStates: the number of quasi-discrete states the system should have
+        predecessors: a list of lists which defines the preceeding states of each state
+            Note: Don't set up mutual predecessors (i.e. a loop with two states). This does not work. You need at least 3 states for a loop
+        alpha: "state growth factor" determines the speed at which a state becomes dominant. Effectively speeds up or slows down the machine
+        nu: "saddle value": Determines how easy it is to push away from the state. 
+        Attention: This value has a lower boundary depending on the change of alpha between preceeding and next state
+        If you see unstable behavior or "ringing", turn up this value
+        
+        epsilon: "noise" added to the states, which has the effect of reducing the average dwell time for the preceeding states
+        
+    LEss important paramters:     
+        beta: scaling factor for the state variable.
+        dt: time step at which the system is simulated
+        
+    """
     
     def __init__(self):
          self.numStates = 0
          self.t = 0.0
-         self.predecessors = [[2,4],[0],[1],[0],[3]]
-         self.setParameters(5, 100., epsilon = [1e-10, 1e-9, 1e-6, 1e-9, 1e-10])         
+         self.setParameters()
          
          
-    def setParameters(self, numStates, alpha=1.0, epsilon=1e-9, nu=2.5,  beta=1.0, dt=1e-2, reset=False):
+    def setParameters(self, numStates=3, predecessors=[[2],[0],[1]], alpha=100.0, epsilon=1e-9, nu=2.5,  beta=1.0, dt=1e-2, reset=False):
         oldcount = self.numStates
         self.dt=dt
         self.numStates = numStates
@@ -48,12 +68,25 @@ class SHC():
         self.velocitylimit = _np.ones((self.numStates)) * 8e1
         self.velocitylimit[2] = 1e2
         self.velocitylimitInv = 1./self.velocitylimit
+        self.predecessors = predecessors
+        self.transitionTriggerInput = _np.zeros((self.numStates)) #input to trigger state transitions
+        self.transitionPhaseInput = _np.zeros((self.numStates,self.numStates)) #input to synchronize state transitions (slower/faster)
         self.updateRho()
         if self.numStates != oldcount or reset: #force reset if number of states change
             self.statevector = _np.zeros((numStates))
             self.statevector[0] = self.beta[0] #start at state 0
 
-       
+    def updatePredecessors(self, listoflist):
+        self.predecessors=listoflist
+        self.updateRho()
+
+
+    def updateTransitionTriggerInput(self, successorBias):
+        _np.copyto(self.transitionTriggerInput, successorBias)
+        
+    def updateTransitionSyncInput(self, transitionPhases):
+         _np.copyto(self.transitionPhaseInput, transitionPhases)
+    
     def _sanitizeParam(self, p):
         if (type(p) is float) or (type(p) is int):
             sanitizedP = _np.empty((self.numStates))
@@ -100,25 +133,16 @@ class SHC():
             #noise_velocity = _np.dot(self.rho, noise_velocity)
             excitation = self.alpha - _np.dot(self.rho, self.statevector)
             drift = (self.statevector * excitation + mu)  #estimate gradient
+            
+            #likeliPhase = _np.dot(1/self.statevector, _np.dot(self.transitionPhaseInput, self.statevector)) #selects which sync signal will be used
+            #phaseError = self.statevector - likeliPhase 
+            
             driftLimited = self.velocitylimit * (_limitFunction(drift * self.velocitylimitInv)) #sigmoid function used as velocity limiter
             
-            self.dotstatevector = driftLimited + noise_velocity
+            self.dotstatevector = driftLimited + noise_velocity + self.transitionTriggerInput
             self.statevector = _np.maximum(self.statevector + self.dotstatevector*dt , 0) #set the new state and also ensure nonegativity
 
             self.t = self.t + dt
-            normalized_states = shc.betaInv * self.statevector
+            normalized_states = self.betaInv * self.statevector
             return normalized_states**1.0
-        
-
-shc = SHC()
-states = _np.vstack([shc.step() for i in range(1000)])
-
-import matplotlib.pylab as plt
-fig =plt.figure(figsize=(20,3))
-for i in range(states.shape[1]):
-    plt.plot( -1.0*i + states[:,i], color='b')   
-    
-def plotfunc(func):
-    x= _np.linspace(-3., 3.0, 500)
-    y = [func(v) for v in x]
-    plt.plot(x,y)
+       
