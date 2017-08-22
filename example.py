@@ -25,7 +25,7 @@ shc.setParameters(
 states = _np.vstack([shc.step() for i in range(1000)])
 
 import matplotlib.pylab as plt
-fig =plt.figure(figsize=(2,0.3))
+fig =plt.figure(figsize=(25,5))
 for i in range(states.shape[1]):
     plt.plot( -1.0*i + states[:,i], color='b')   
     
