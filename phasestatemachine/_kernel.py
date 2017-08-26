@@ -27,7 +27,7 @@ def _limitFunction(x):
         return 2*(expit(2*x)-0.5)
 
 
-class SHC():
+class Kernel():
     """
     This class encapsulates a dynamical system that can behave state-like like a classical determinisitic automaton
     The transitions though are smooth, which enables a continuous synchronization of motion during such a transition
@@ -48,6 +48,18 @@ class SHC():
         beta: scaling factor for the state variable.
         dt: time step at which the system is simulated
         
+        
+    states:
+        phase matrix: A (numStates x numStates) matrix aggregating all phase variables for each possible transition, plus the state vector on the diagonal
+        activation matrix: A matrix which contains the corresponding transition activation values. state activations correspond to the 1-sum(transition activations)
+                            so that sum(matrix) = 1 (i.e.e can be used as a weighing matrix)
+        
+    inputs:
+        observed phase: A matrix analogous to the phase matrix, containing phase estimates conditional to the transition or phase being activated
+        observed phase confidence: A matrix analogous to the activation matrix, which indicates how confident the state observation is
+        inputbias: vector that signals which state should currently be the next (e.g. from perception)
+        
+        
     """
     
     def __init__(self):
@@ -56,7 +68,7 @@ class SHC():
          self.setParameters()
          
          
-    def setParameters(self, numStates=3, predecessors=[[2],[0],[1]], alpha=100.0, epsilon=1e-9, nu=2.5,  beta=1.0, dt=1e-2, reset=False):
+    def setParameters(self, numStates=3, predecessors=[[2],[0],[1]], alpha=40.0, epsilon=1e-9, nu=1.5,  beta=1.0, dt=1e-2, reset=False):
         oldcount = self.numStates
         self.dt=dt
         self.numStates = numStates
@@ -143,6 +155,7 @@ class SHC():
         for state, predecessorsPerState in enumerate(self.predecessors):
             #precedecessorcount = len(predecessorsPerState)
             for predecessor in predecessorsPerState:
+                if state == predecessor: raise ValueError("Cannot set a state ({0}) as predecessor of itself!".format(state))
                 rho[state, predecessor] = (self.alpha[state] - (self.alpha[predecessor]/self.nu[predecessor])) * self.betaInv[predecessor]
                 self.stateConnectivityMap[state, predecessor] = 1 
         self.rho = rho
@@ -172,8 +185,12 @@ class SHC():
         phaseActivation = betainc(1,5, phaseActivationPre)
         phaseActivation = phaseActivation + _np.diag(statevector) * (1.0-_np.sum(phaseActivation))
         
+        #compute the phases:
         s_square = s.repeat(len(statevector), axis=1)
-        phaseProgress = (2./_np.pi) * _np.arctan2(s_square, s_square.T)
+        phaseProgress = 0.5 + 0.5 * ( s_square - s_square.T)
+        phaseProgress = _np.clip(phaseProgress, 0.0, 1.0)
+        
+        #phaseProgress = (2./_np.pi) * _np.arctan2(s_square, s_square.T)   #alternative method that directly produces a bounded output
         
         return phaseActivation , phaseProgress
     
