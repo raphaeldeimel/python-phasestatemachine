@@ -8,6 +8,7 @@ This tests demonstrates terminal states, and how to reset the system
 
 import sys
 sys.path.append('../')
+import os
 
 #import the phase-state-machine package
 import phasestatemachine 
@@ -56,4 +57,4 @@ phasta.updateTransitionTriggerInput([0,0,0, -1e-7])
 for i in range(int(t1/phasta.dt)):
     phasta.step()
 
-visualize(phasta, t1+t2+t1+t2+t1, sectionsAt=[t1, t1+t2+t1])
+visualize(phasta, t1+t2+t1+t2+t1, sectionsAt=[t1, t1+t2+t1], name=os.path.splitext(os.path.basename(__file__))[0])

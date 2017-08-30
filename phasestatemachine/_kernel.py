@@ -9,23 +9,6 @@ import pandas as _pd
 from scipy.special import expit, betainc
 import itertools
 
-@_np.vectorize
-def _limitFunction2(x):
-        """
-        limits positive values
-        """
-        if x<0.01:
-            return x
-        else:
-            return 2*(expit(2*x)-0.5)
-
-
-def _limitFunction(x):
-        """
-        limits transition velocity
-        """
-        return 2*(expit(2*x)-0.5)
-
 
 class Kernel():
     """
@@ -79,15 +62,17 @@ class Kernel():
         self.epsilon = self._sanitizeParam(epsilon) * self.beta #wiener process noise
         self.epsilonPerDt = self.epsilon *_np.sqrt(self.dt)/dt #factor accounts for the accumulation during a time step
         self.input = _np.ones((self.numStates)) * 0e0
-        self.velocitylimit = _np.ones((self.numStates)) * 1e3
-        self.velocitylimitInv = 1./self.velocitylimit
         self.predecessors = predecessors
         self.transitionTriggerInput = _np.zeros((self.numStates)) #input to trigger state transitions
         self.phasesLagInput = _np.zeros((self.numStates,self.numStates)) #input to synchronize state transitions (slower/faster)
+        self.phaseVelocityExponentInput = _np.zeros((self.numStates,self.numStates))  #contains values that limit transition velocity
         self.updateRho()
         if self.numStates != oldcount or reset: #force reset if number of states change
             self.statevector = _np.zeros((numStates))
+            self.dotstatevector = _np.zeros((numStates))
             self.statevector[0] = self.beta[0] #start at state 0
+            self.phasesActivationPre = _np.zeros((self.numStates,self.numStates))
+            self.phasesActivationPre[0,0] = 1.0
             self.phasesActivation, self.phasesProgress = self.getPhasesFromState(self.statevector) #update the phases computation
             #columnnames = ["S{0}".format(i) for i in range(self.numStates)]
             self.statehistory = _np.empty((1000000, self.numStates+1))
@@ -119,11 +104,24 @@ class Kernel():
         _np.copyto(self.phasesLagInput, phasesLag)
 
 
-    def updateTransitionVelocityLimits(self, limits):
-        _np.copyto(self.velocitylimit, limits)
-        #self.velocitylimit = self._sanitizeParam(limits)
-        self.velocitylimitInv = 1./self.velocitylimit
-
+    def updateTransitionPhaseVelocityExponentInput(self, limits):
+        """
+        Update the matrix that specifies how fast the given phases should progress
+        
+        Each element effectively is an exponent with base 2 for adjusting each phase velocity individually
+        
+        limits[j,i]: exponent for the transition from i to j
+        limits[i,i]: 0 (enforced implicitly)
+        
+        
+        While phase velocity can also be controlled by the self.alpha vector directly, 
+        large variations to individual states' alpha parameter can alter the 
+        convergence behavior and we may lose the stable heteroclinic channel properties
+        
+        This method here effectly "scales" the timeline during transitions
+        """
+        self.phaseVelocityExponentInput = _np.array(limits)
+        _np.fill_diagonal(self.phaseVelocityExponentInput , 0)
     
     def _sanitizeParam(self, p):
         if (type(p) is float) or (type(p) is int):
@@ -160,6 +158,7 @@ class Kernel():
                 self.stateConnectivityMap[state, predecessor] = 1 
         self.rho = rho
         self._staticWeighingMatrix = self.stateConnectivityMap  + _np.identity(self.numStates)  * (0.25**0.5)  #static matrix to properly normalize phase progress values        
+
         
      
     def _recordState(self):
@@ -180,15 +179,17 @@ class Kernel():
         
         returns the values as two matrices enconding transitions as [next, previous] elements
         """
-        s = statevector.reshape((-1,1)) #proper row vector
+        statevector_normalized = statevector * self.betaInv
+        s = statevector_normalized.reshape((-1,1))  #proper row vector
         phaseActivationPre =  (4 * s @ s.T) * self.stateConnectivityMap 
         phaseActivation = betainc(1,5, phaseActivationPre)
-        phaseActivation = phaseActivation + _np.diag(statevector) * (1.0-_np.sum(phaseActivation))
+        phaseActivation = phaseActivation + _np.diag(statevector_normalized) * (1.0-_np.sum(phaseActivation))
         
         #compute the phases:
-        s_square = s.repeat(len(statevector), axis=1)
+        s_square = s.repeat(len(statevector_normalized), axis=1)
         phaseProgress = 0.5 + 0.5 * ( s_square - s_square.T)
-        phaseProgress = _np.clip(phaseProgress, 0.0, 1.0)
+        phaseProgress = betainc(3,3,phaseProgress) 
+        #phaseProgress = _np.clip(phaseProgress, 0.0, 1.0)
         
         #phaseProgress = (2./_np.pi) * _np.arctan2(s_square, s_square.T)   #alternative method that directly produces a bounded output
         
@@ -207,13 +208,13 @@ class Kernel():
             
             effectively a velocity controller
             """
-            gain = 0.1 / self.dt #balances intrinsic speed vs. observed speed
+            gain = 0.0 / self.dt #balances intrinsic speed vs. observed speed
             error = _np.sum(self.phasesActivation * self.phasesLagInput)
             self.errorHistory[self.historyIndex] =  error
             if _np.sum(error) ==  _np.sum(error):
                 velocityAdjusted = velocity * (1.0 - gain * error)
             else :
-                velocityAdjusted = velocity 
+                velocityAdjusted = velocity
                 print("Skipping adjustment of velocity as i coputed a NAN")
             return velocityAdjusted
         
@@ -227,23 +228,44 @@ class Kernel():
 
             mu = 0.0
             dt = self.dt
-            
+
+            #advance time
+            self.t = self.t + dt
+                        
             noise_velocity = _np.random.normal(scale = self.epsilonPerDt, size=self.numStates) #discretized wiener process noise
-            #noise_velocity = self.epsilonPerDt * _np.random.chisquare(1, size=self.numStates) #discretized wiener process noise
-            #noise_velocity = _np.dot(self.rho, noise_velocity)
+
+            acceleration = 2**_np.sum(self.phasesActivation * self.phaseVelocityExponentInput) #copmute alpha vector from the wieghted sum of the alpha matrix
+            #print(acceleration)
             excitation = self.alpha - _np.dot(self.rho, self.statevector)
-            drift = (self.statevector * excitation + mu)  #estimate gradient
             
-            #likeliPhase = _np.dot(1/self.statevector, _np.dot(self.transitionPhaseInput, self.statevector)) #selects which sync signal will be used
-            #phaseError = self.statevector - likeliPhase 
+            drift = (self.statevector * excitation * acceleration   + mu)  #estimate gradient
             
-            #driftLimited = self.velocitylimit * (_limitFunction(drift * self.velocitylimitInv)) #sigmoid function used as velocity limiter
-            driftLimited = self.getDesiredVelocityAdjustment(drift)
+            #add adjustments by an external phase control:            
+            driftAdjusted = self.getDesiredVelocityAdjustment(drift)
             
-            self.dotstatevector = driftLimited + noise_velocity + self.transitionTriggerInput
+            #limit the phase transition velocity:
+            #driftLimited = self.velocitylimit * 2*(expit(driftAdjusted * self.velocitylimitInv)-0.5)
+            
+            #if _np.sum(driftLimited) != _np.sum(driftLimited):
+            #        print(driftLimited)
+            self.dotstatevector = driftAdjusted + noise_velocity + self.transitionTriggerInput
             self.statevector = _np.maximum(self.statevector + self.dotstatevector*dt , 0) #set the new state and also ensure nonegativity
 
-            self.phasesActivation, self.phasesProgress = self.getPhasesFromState(self.statevector) #update the phases computation
-            self.t = self.t + dt
+#            self.phasesActivation, self.phasesProgress = self.getPhasesFromState(self.statevector) #update the phases computation
+            
+            
+            statevector_normalized = self.statevector*self.betaInv
+            s = statevector_normalized.reshape((-1,1))  #proper row vector
+            self.phasesActivationPre =  (s @ s.T) * self.stateConnectivityMap
+            
+            phasesActivation = betainc(1,1, 4 * self.phasesActivationPre )
+            self.phasesActivation = phasesActivation  + _np.diag(statevector_normalized) * (1.0-_np.sum(phasesActivation))
+            #print("|s|: ", _np.sum(statevector_normalized))
+
+            #compute the phases:
+            s_square = s.repeat(len(statevector_normalized), axis=1)
+            phasesProgress = 0.5 + 0.5 * ( s_square - s_square.T)
+            self.phasesProgress = _np.clip(phasesProgress, 0.0, 1.0)
+
             self._recordState()
             return self.statevector       

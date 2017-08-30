@@ -9,6 +9,7 @@ This tests the branching and aggregation capabilities
 import numpy
 import sys
 sys.path.append('../')
+import os
 
 #import the phase-state-machine package
 import phasestatemachine 
@@ -30,8 +31,6 @@ phasta.setParameters(
     predecessors = predecessors, 
     )         
 
-phasta.updateTransitionVelocityLimits(0.1e0)
-
 #set up biases so that we favor one out the 16 possible branches:
 import collections
 bias = collections.deque([0.0]*16)
@@ -49,4 +48,4 @@ for i in range(int(endtime/phasta.dt)):
     elif phasta.statevector[0] > 0.9:
         triggered = False
 
-visualize(phasta, endtime)
+visualize(phasta, endtime, name=os.path.splitext(os.path.basename(__file__))[0])

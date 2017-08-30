@@ -3,15 +3,14 @@
 """
 @author: Raphael Deimel
 
-This tests demonstrates blocking and unblocking of state transitions
+This tests demonstrates how to slow down and speed up a transition
+
+
 """
 
-import numpy
 import sys
 sys.path.append('../')
 import os
-
-from matplotlib import pylab as plt
 
 #import the phase-state-machine package
 import phasestatemachine 
@@ -22,36 +21,35 @@ from common_code import visualize
 
 #Set up the state transition map as a list of predecessors for each state:
 predecessors = [
-  [2,3,4],   
-  [0],      #state to stop in
-  [1],[1],[1], 
+  [2],
+  [0],
+  [1], 
 ]
+
+#Make the first two transitions slower (negative exponent), 
+#and the the third transition faster (positive exponent)
+phaseVelocityExponentsMatrix = [[0., 0., 5.],[-4,0,0.],[0., -7., 0.]]
 
 phasta = phasestatemachine.Kernel()
 phasta.setParameters(
-    numStates = 5,
-    predecessors = predecessors, 
+    numStates=3,
+    predecessors=predecessors, 
     )         
 
 
-t1 = 5.0
-t2 = 5.0
+t1 = 3.2
+t2 = 8.8
 
 #negatively bias transition towards states 2-4 to block transition from state 1:
-phasta.updateTransitionTriggerInput([0.0, 0.0, -1e-7, -1e-7, -1e-7]) 
-#alternative: specify the state to block in and project a blocking bias on all successors with phasta.stateConnectivityMap
-phasta.updateTransitionTriggerInput(  phasta.stateConnectivityMap @ numpy.array([0.0, -1e-7, 0,0,0]) ) 
-
+#phasta.updateTransitionTriggerInput(bias) 
 #evolve the system for some time
 for i in range(int(t1/phasta.dt)):
     phasta.step()
 
-#reset bias towards state 3 to zero - the kernel will start to transition towards that state
-phasta.updateTransitionTriggerInput([0.0, 0.0, -1e-7, 0.0, -1e-7]) #
+phasta.updateTransitionPhaseVelocityExponentInput(phaseVelocityExponentsMatrix)
 
 for i in range(int(t2/phasta.dt)):
     phasta.step()
 
-    
 visualize(phasta, t1+t2, sectionsAt=[t1], name=os.path.splitext(os.path.basename(__file__))[0])
 

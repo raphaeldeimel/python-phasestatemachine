@@ -12,6 +12,7 @@ Due to the cumulative nature, often both transitions get activated to some exten
 
 import sys
 sys.path.append('../')
+import os
 
 #import the phase-state-machine package
 import phasestatemachine 
@@ -46,4 +47,4 @@ phasta.updateTransitionTriggerInput([0, 1*epsilon, 0, 0])
 for i in range(int(endtime/phasta.dt)):
     phasta.step()
 
-visualize(phasta, endtime)
+visualize(phasta, endtime, name=os.path.splitext(os.path.basename(__file__))[0])
