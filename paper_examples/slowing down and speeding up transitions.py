@@ -38,7 +38,7 @@ phasta.setParameters(
 
 
 t1 = 3.2
-t2 = 8.8
+t2 = 22.8
 
 #negatively bias transition towards states 2-4 to block transition from state 1:
 #phasta.updateTransitionTriggerInput(bias) 
