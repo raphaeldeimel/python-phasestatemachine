@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 @author: Raphael Deimel
+@copyright 2017
+@licence: 2-clause BSD licence
+
 
 This tests demonstrates how to slow down and speed up a transition
 

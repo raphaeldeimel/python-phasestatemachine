@@ -2,3 +2,5 @@
 paper_examples/__pycache__/
 
 figures/
+
+*.pyc

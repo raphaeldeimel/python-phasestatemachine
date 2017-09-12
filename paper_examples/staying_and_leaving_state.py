@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 @author: Raphael Deimel
+@copyright 2017
+@licence: 2-clause BSD licence
+
 
 This tests demonstrates blocking and unblocking of state transitions
 """
@@ -22,14 +25,14 @@ from common_code import visualize
 
 #Set up the state transition map as a list of predecessors for each state:
 predecessors = [
-  [2,3,4],   
-  [0],      #state to stop in
-  [1],[1],[1], 
+  [2],   
+  [0],
+  [1] 
 ]
 
 phasta = phasestatemachine.Kernel()
 phasta.setParameters(
-    numStates = 5,
+    numStates = 3,
     predecessors = predecessors, 
     )         
 
@@ -37,21 +40,28 @@ phasta.setParameters(
 t1 = 5.0
 t2 = 5.0
 
-#negatively bias transition towards states 2-4 to block transition from state 1:
-phasta.updateTransitionTriggerInput([0.0, 0.0, -1e-7, -1e-7, -1e-7]) 
-#alternative: specify the state to block in and project a blocking bias on all successors with phasta.stateConnectivityMap
-phasta.updateTransitionTriggerInput(  phasta.stateConnectivityMap @ numpy.array([0.0, -1e-7, 0,0,0]) ) 
+#negatively bias transition towards state 2 to block transition from state 1:
+phasta.updateTransitionTriggerInput([0.0, 0.0, -1e-7]) 
+#alternative: specify the state to block in and project a blocking bias on all successors with the phasta.stateConnectivityMap
+phasta.updateTransitionTriggerInput(  numpy.dot(phasta.stateConnectivity, numpy.array([0.0, -1e-7, 0.0,])) ) 
 
 #evolve the system for some time
 for i in range(int(t1/phasta.dt)):
     phasta.step()
 
-#reset bias towards state 3 to zero - the kernel will start to transition towards that state
-phasta.updateTransitionTriggerInput([0.0, 0.0, -1e-7, 0.0, -1e-7]) #
+#un-freeze the state by setting the bias back to non-negative values.
+# positive values will reduce the dwell-time considerably: 
+phasta.updateTransitionTriggerInput([0.0, 0.0, 1e-1]) #
 
-for i in range(int(t2/phasta.dt)):
+t2a = 0.1
+for i in range(int(t2a/phasta.dt)):
     phasta.step()
 
-    
-visualize(phasta, t1+t2, sectionsAt=[t1], name=os.path.splitext(os.path.basename(__file__))[0])
+phasta.updateTransitionTriggerInput([0.0, 0.0, 0.0]) #
+
+for i in range(int((t2-t2a)/phasta.dt)):
+    phasta.step()
+
+
+visualize(phasta, t1+t2, sectionsAt=[t1, t1+t2a], name=os.path.splitext(os.path.basename(__file__))[0])
 

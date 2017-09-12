@@ -1,4 +1,8 @@
 #!/bin/bash
+#@author: Raphael Deimel
+#@copyright 2017
+#@licence: 2-clause BSD licence
+
 PYTHON=python3
 
 $PYTHON branch_and_aggregation.py  

@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 @author: Raphael Deimel
+@copyright 2017
+@licence: 2-clause BSD licence
+
 
 This tests demonstrates taking random transitions similar to an MDP
 
@@ -38,10 +41,10 @@ phasta.setParameters(
     )         
 
 
-endtime = 50.0
+endtime = 25.0
 
-#negatively bias transition towards states 2-4 to block transition from state 1:
-phasta.updateTransitionTriggerInput([0, 1*epsilon, 0, 0]) 
+#Variation: negatively bias transition towards states 2-4 to block transition from state 1:
+#phasta.updateTransitionTriggerInput([0, 1*epsilon, 0, 0]) 
 
 #evolve the system for some time
 for i in range(int(endtime/phasta.dt)):

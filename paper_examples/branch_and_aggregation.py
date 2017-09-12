@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 @author: Raphael Deimel
+@copyright 2017
+@licence: 2-clause BSD licence
 
 This tests the branching and aggregation capabilities
 """

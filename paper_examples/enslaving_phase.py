@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 @author: Raphael Deimel
+@copyright 2017
+@licence: 2-clause BSD licence
+
 
 This tests shows how to enslave a phase to an external signal
 
@@ -58,7 +61,7 @@ gains = [[0, 0., 0.],[80,0.,0.],[0., 0., 0.]]
 phasta.updateVelocityEnslavementGain(gains)
 
 for i in range(int(t2/phasta.dt)):
-    phasta.updatePhasesInput(phaseTarget[i] * phasta.stateConnectivityMap )    
+    phasta.updatePhasesInput(phaseTarget[i])    
     phasta.step()
 
 from matplotlib import pylab as plt
