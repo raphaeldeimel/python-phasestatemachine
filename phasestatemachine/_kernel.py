@@ -141,18 +141,20 @@ class Kernel():
 
 
 
-    def step(self, period=None):
+    def step(self, period=None, until=None):
             """
             Main algorithm, implementing the integration step, state space decomposition, phase control and velocity adjustment.
             
             """
-            #if a period is given, iterate until we finished that period:
+            #if a period is given, iterate until we finished that period:            
             if period is not None:
                 endtime = self.t + period - 0.5*self.dt
                 while self.t < endtime:
-                    self.step(period=None)
+                    self.step(period=None, until=until)
+            if until is not None: 
+                while self.t < until:
+                    self.step()
 
-            
             kd = 2**_np.sum(self.phasesActivation * self.phaseVelocityExponentInput) #compute adjustment to the instantaneously effective growth factor
             
             #compute mu for phase control:
