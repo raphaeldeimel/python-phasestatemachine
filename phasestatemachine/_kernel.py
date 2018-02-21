@@ -206,6 +206,17 @@ class Kernel():
 
 
 
+    def sayState(self):
+        i = _np.argmax(self.phasesActivation)
+        predecessor = i % self.numStates
+        successor = i // self.numStates
+        if predecessor == successor:
+            return "{0}".format(predecessor)
+        else:
+            return "{0}->{1}".format(predecessor, successor)
+
+
+
 
 
 
