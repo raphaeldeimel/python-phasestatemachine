@@ -232,13 +232,13 @@ class Kernel():
        
         Note: states cannot be their own successors, so these values ignored!                
         """
-        if _np.isscalar(successorBias):
-            self.transitionTriggerInputMatrix = successorBias * self._biasMask
-        bias = _np.array(successorBias)
+        bias = _np.asarray(successorBias)
+        if bias.ndim == 0:
+            self.transitionTriggerInputMatrix = bias * self._biasMask
         if bias.ndim == 1:
-            self.transitionTriggerInputMatrix = _np.repeat(bias, self.numStates, axis=1) * self._biasMask
+            self.transitionTriggerInputMatrix = bias[:, _np.newaxis] * self._biasMask
         elif bias.ndim == 2:
-            #_np.copyto(self.transitionTriggerInputMatrix, bias)
+            _np.copyto(self.transitionTriggerInputMatrix, bias)
             self.transitionTriggerInputMatrix = self._biasMask * self.transitionTriggerInputMatrix
         
     def updatePhasesInput(self, phases):
