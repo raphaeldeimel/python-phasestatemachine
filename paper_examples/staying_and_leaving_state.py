@@ -11,7 +11,7 @@ This tests demonstrates blocking and unblocking of state transitions
 
 import numpy
 import sys
-sys.path.append('../')
+sys.path.insert(0,'../src')
 import os
 
 from matplotlib import pylab as plt

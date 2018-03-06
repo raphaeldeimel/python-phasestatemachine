@@ -14,8 +14,9 @@ Due to the cumulative nature, often both transitions get activated to some exten
 """
 
 import sys
-sys.path.append('../')
+sys.path.insert(0,'../src')
 import os
+import numpy
 
 #import the phase-state-machine package
 import phasestatemachine 
@@ -31,23 +32,46 @@ predecessors = [
   [0], 
   [2], 
 ]
-epsilon = 1e-9
-
+epsilon = 0
+dt=1e-2
 phasta = phasestatemachine.Kernel()
 phasta.setParameters(
+    dt=dt,
     numStates=4,
     predecessors=predecessors, 
     epsilon=epsilon, 
     )         
 
 
-endtime = 25.0
+endtime = 50.0
 
 #Variation: negatively bias transition towards states 2-4 to block transition from state 1:
 #phasta.updateTransitionTriggerInput([0, 1*epsilon, 0, 0]) 
 
+Gamma = numpy.array([
+[   0, 1e-9, 0, 1e-9 ],
+[   0,    0, 0,    0 ],
+[1e-4,    0, 0,    0 ],
+[   0,    0, 0,    0 ],
+])
+
+
+
+noiseScale = 1e-4 * numpy.sqrt(dt)/dt
+
 #evolve the system for some time
 for i in range(int(endtime/phasta.dt)):
+    Gamma[1,2] = 3 * numpy.random.normal(scale=noiseScale)
+    Gamma[3,2] = 1* numpy.random.normal(scale=noiseScale)
+    bias = numpy.dot(Gamma, phasta.statevector)
+    phasta.updateTransitionTriggerInput(Gamma)
     phasta.step()
 
-visualize(phasta, endtime, name=os.path.splitext(os.path.basename(__file__))[0])
+visualize(phasta, endtime, name=os.path.splitext(os.path.basename(__file__))[0], clipActivations=0.05)
+
+
+
+
+
+
+

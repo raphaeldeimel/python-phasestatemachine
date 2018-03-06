@@ -12,7 +12,7 @@ This tests demonstrates how to slow down and speed up a transition
 """
 
 import sys
-sys.path.append('../')
+sys.path.insert(0,'../src')
 import os
 
 #import the phase-state-machine package

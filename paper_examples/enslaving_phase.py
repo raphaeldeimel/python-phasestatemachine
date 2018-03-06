@@ -11,7 +11,7 @@ This tests shows how to enslave a phase to an external signal
 """
 
 import sys
-sys.path.append('../')
+sys.path.insert(0,'../src')
 import os
 import numpy
 numpy.set_printoptions(precision=2, suppress=True)

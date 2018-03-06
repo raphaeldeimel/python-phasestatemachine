@@ -12,7 +12,7 @@ This tests demonstrates taking late decisions by activating all transitions firs
 
 
 import sys
-sys.path.append('../')
+sys.path.insert(0,'../src')
 import os
 
 #import the phase-state-machine package

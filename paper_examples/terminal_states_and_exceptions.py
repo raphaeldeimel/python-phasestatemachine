@@ -10,7 +10,7 @@ This tests demonstrates terminal states, and how to reset the system
 """
 
 import sys
-sys.path.append('../')
+sys.path.insert(0,'../src')
 import os
 
 #import the phase-state-machine package

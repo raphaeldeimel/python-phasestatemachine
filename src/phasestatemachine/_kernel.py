@@ -98,7 +98,7 @@ class Kernel():
             self.phasesActivation = _np.zeros((self.numStates,self.numStates))
             self.phasesActivationBeta = _np.zeros((self.numStates,self.numStates))
             self.phasesProgress = _np.zeros((self.numStates,self.numStates))
-            self.transitionTriggerInput = _np.zeros((self.numStates))
+            self.transitionTriggerInput = _np.zeros((self.numStates, self.numStates))
             self._biasMask = (1-_np.eye((self.numStates)))
             
             #these data structures are used to save the history of the system:
@@ -249,8 +249,7 @@ class Kernel():
         if bias.ndim == 1:
             self.transitionTriggerInputMatrix = bias[:, _np.newaxis] * self._biasMask
         elif bias.ndim == 2:
-            _np.copyto(self.transitionTriggerInputMatrix, bias)
-            self.transitionTriggerInputMatrix = self._biasMask * self.transitionTriggerInputMatrix
+            self.transitionTriggerInputMatrix = self._biasMask * bias 
         
     def updatePhasesInput(self, phases):
         """

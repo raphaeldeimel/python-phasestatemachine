@@ -10,7 +10,7 @@ This tests the branching and aggregation capabilities
 
 import numpy
 import sys
-sys.path.append('../')
+sys.path.insert(0,'../src')
 import os
 
 #import the phase-state-machine package

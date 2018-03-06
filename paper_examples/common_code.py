@@ -26,13 +26,17 @@ def plotLineWithVariableWidth(axis, x,y,s, color=None):
     axis.add_collection(lc)
     
     
-def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True):
+def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True, clipActivations=0.01):
     """
     plots a timing diagram of the phase-state machine
     """
     #get the data:
     states, phasesActivation, phasesProgress = phasta.getHistory()
     t=states[:,0]
+    
+    #clip activations:
+    phasesActivation = _np.clip( (phasesActivation-clipActivations) / (1.0-clipActivations), 0, 1)
+    
     
     #set up the plot with guides:
     if newFigure: 
@@ -59,8 +63,8 @@ def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True):
     [  plotLineWithVariableWidth(axis, t[:], [i]*len(t[:]),              phasesActivation[:,i,i], color='black'    ) for i in range(len(p)) ]
     
     
-    plt.savefig("../figures/phase_evolution_{}.pdf".format(name))
-    plt.savefig("../figures/phase_evolution_{}.png".format(name), dpi=600)
+    plt.savefig("./figures/phase_evolution_{}.pdf".format(name))
+    plt.savefig("./figures/phase_evolution_{}.png".format(name), dpi=600)
 
 
 
