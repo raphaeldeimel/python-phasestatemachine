@@ -83,7 +83,7 @@ class Kernel():
         self.activationThreshold = 0.05          #clip very small activations below this value to avoid barely activated states
 
         #inputs:
-        self.transitionTriggerInputMatrix = _np.zeros((self.numStates,self.numStates)) #determines transition preferences and state timeout duration
+        self.BiasMatrix = _np.zeros((self.numStates,self.numStates)) #determines transition preferences and state timeout duration
         
         self.phasesInput = _np.zeros((self.numStates,self.numStates)) #input to synchronize state transitions (slower/faster)
         self.velocityAdjustmentGain = _np.zeros((self.numStates,self.numStates))  #gain of the control enslaving the given state transition
@@ -98,7 +98,7 @@ class Kernel():
             self.phasesActivation = _np.zeros((self.numStates,self.numStates))
             self.phasesActivationBeta = _np.zeros((self.numStates,self.numStates))
             self.phasesProgress = _np.zeros((self.numStates,self.numStates))
-            self.transitionTriggerInput = _np.zeros((self.numStates, self.numStates))
+            self.biases = _np.zeros((self.numStates, self.numStates))
             self._biasMask = (1-_np.eye((self.numStates)))
             
             #these data structures are used to save the history of the system:
@@ -171,13 +171,13 @@ class Kernel():
             noise_velocity = _np.random.normal(scale = self.epsilonPerDt, size=self.numStates) #discretized wiener process noise
 
             #compute which transition biases should be applied right now:
-            self.transitionTriggerInput = _np.dot(self.transitionTriggerInputMatrix, self.statevector)
+            self.biases = _np.dot(self.BiasMatrix, self.statevector)
 
             
             #This is the core computation and time integration of the dynamical system:
             growth = self.alpha - _np.dot(self.rho, self.statevector)
             velocity = self.statevector * growth * kd  + mu  #estimate velocity
-            self.dotstatevector = velocity + noise_velocity + self.transitionTriggerInput
+            self.dotstatevector = velocity + noise_velocity + self.biases
             self.statevector = _np.maximum(self.statevector + self.dotstatevector*self.dt , 0) #set the new state and also ensure nonegativity
             
             self.t = self.t + self.dt #advance time
@@ -227,9 +227,26 @@ class Kernel():
         self.predecessors=listoflist
         self._updateRho()
 
+    def updateB(self, successorBias):
+        """
+        changes the "bias" input array
+        
+        Small values bias the system to hasten transitions towards that state
+        
+        Large, short spikes can be used to override any state and force the system into any state, 
+        regardless of state connectivity
+        
+        successorBias: matrix of biases for each (successor state, current state) 
+       
+        Note: states cannot be their own successors, so these values ignored!
+        """
+        bias = _np.asarray(successorBias)
+        self.BiasMatrix = self._biasMask * bias 
+        
+        
     def updateTransitionTriggerInput(self, successorBias):
         """
-        changes the "bias" input vector (or array)
+        changes the "bias" input array (or vector)
         
         Small values bias the system to hasten transitions towards that state
         
@@ -245,11 +262,11 @@ class Kernel():
         """
         bias = _np.asarray(successorBias)
         if bias.ndim == 0:
-            self.transitionTriggerInputMatrix = bias * self._biasMask
+            self.updateB(bias * self._biasMask)
         if bias.ndim == 1:
-            self.transitionTriggerInputMatrix = bias[:, _np.newaxis] * self._biasMask
+            self.updateB(bias[:, _np.newaxis] * self._biasMask)
         elif bias.ndim == 2:
-            self.transitionTriggerInputMatrix = self._biasMask * bias 
+            self.updateB(bias)
         
     def updatePhasesInput(self, phases):
         """
