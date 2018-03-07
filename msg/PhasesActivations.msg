@@ -1,4 +1,5 @@
+time stamp
 uint32 states
-float32[] psi
-float32[] lambda
+float32[] phases
+float32[] activations
 
