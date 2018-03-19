@@ -198,22 +198,34 @@ class Kernel():
             s_square = s.repeat(len(statevector_normalized), axis=1)
             self.phasesProgress = betainc(self.nonlinearityParamsPsi[0],self.nonlinearityParamsPsi[1], _np.clip(0.5 + 0.5 * ( s_square - s_square.T), 0.0, 1.0))
 
+            #note the currently most active state/transition (for informative purposes)
+            i = _np.argmax(self.phasesActivation)
+            self.currentPredecessor = i % self.numStates
+            self.currentSuccessor = i // self.numStates
+
+
             self._recordState()
             return self.statevector
             
 
 
 
-
+    def get1DState(self):
+        """
+        return value of a one-dimensional signal that indicates which state we are in, or in which transition
+        """
+        value = self.currentPredecessor + (self.currentSuccessor - self.currentPredecessor) * self.phasesProgress[self.currentSuccessor,self.currentPredecessor]
+        return value
+    
 
     def sayState(self):
-        i = _np.argmax(self.phasesActivation)
-        predecessor = i % self.numStates
-        successor = i // self.numStates
-        if predecessor == successor:
-            return "{0}".format(predecessor)
+        """
+        returns a string describing the current state
+        """
+        if self.currentPredecessor == self.currentSuccessor:
+            return "{0}".format(self.currentPredecessor )
         else:
-            return "{0}->{1}".format(predecessor, successor)
+            return "{0}->{1}".format(self.currentPredecessor , self.currentSuccessor)
 
 
 
