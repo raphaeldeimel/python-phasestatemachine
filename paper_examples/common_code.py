@@ -43,8 +43,9 @@ def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True, 
         plt.figure(figsize=(4,2))
     fig=plt.gcf()
     axis=plt.gca()
-    p = phasta.predecessors
+    p = phasta.successors
     n_transitions = sum([len(l) for l in p])
+    n_states = phasta.numStates
     plt.yticks(range(phasta.numStates))
     #[ plt.axhline(y, linewidth=1, color='#eeeeee', zorder=-1) for y in range(phasta.numStates) ]
     plt.xlim(0, endtime)
@@ -59,8 +60,8 @@ def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True, 
     colors = matplotlib.cm.rainbow(_np.linspace(0,1,n_transitions))
     citer = iter(colors)
     #print the data:        
-    [[ plotLineWithVariableWidth(axis, t, j+(i-j)*phasesProgress[:,i,j], phasesActivation[:,i,j], color=next(citer))   for j in p[i]] for i in range(len(p)) ]        
-    [  plotLineWithVariableWidth(axis, t[:], [i]*len(t[:]),              phasesActivation[:,i,i], color='black'    ) for i in range(len(p)) ]
+    [[ plotLineWithVariableWidth(axis, t, i+(j-i)*phasesProgress[:,j,i], phasesActivation[:,j,i], color=next(citer))   for j in p[i]] for i in range(n_states) ]        
+    [  plotLineWithVariableWidth(axis, t[:], [i]*len(t[:]),              phasesActivation[:,i,i], color='black'    ) for i in range(n_states) ]
     
     
     plt.savefig("./figures/phase_evolution_{}.pdf".format(name))

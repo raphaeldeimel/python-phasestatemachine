@@ -57,12 +57,14 @@ class Kernel():
          self.setParameters()
          
 
-    def setParameters(self, numStates=3, predecessors=[[2],[0],[1]], alpha=40.0, epsilon=1e-9, nu=1.5,  beta=1.0, dt=1e-2, reset=False):
+    def setParameters(self, numStates=3, predecessors=None, successors=[[1],[2],[0]], alpha=40.0, epsilon=1e-9, nu=1.5,  beta=1.0, dt=1e-2, reset=False):
         """
         Method to set or reconfigure the phase-state-machine
         
         numStates:  The number of states the system should have
         predecessors: A list of lists which contain the state indices of the respective predecessors
+        successors: A list of lists which contain the state indices of the respective successors
+            Note: use of predecessors and successors parameter is mutually exclusive!
                 
         For the meaning of the other parameters, please consult the paper or the code
         """
@@ -77,7 +79,12 @@ class Kernel():
         self.nu = self._sanitizeParam(nu)
         self.epsilon = self._sanitizeParam(epsilon) * self.beta #wiener process noise
         self.epsilonPerDt = self.epsilon *_np.sqrt(self.dt)/dt #factor accounts for the accumulation during a time step
-        self.predecessors = predecessors
+
+        if predecessors is not None:  #convert list of predecessors into list of successors
+            self.successors = self._predecessorListToSuccessorList(predecessors)
+        else:
+            self.successors = successors
+            
         self.nonlinearityParamsLambda = (2,5)    #parameters of the beta distribution nonlinearity for computing the Lambda matrix values
         self.nonlinearityParamsPsi    = (3,3)    #parameters of the beta distribution nonlinearity that linearizes phase variables
         self.activationThreshold = 0.05          #clip very small activations below this value to avoid barely activated states
@@ -122,18 +129,18 @@ class Kernel():
         stateConnectivity = _np.zeros((self.numStates, self.numStates))
         #first, fill in the standard inhibitory values:
         for state in range(self.numStates):
-            for predecessor in range(self.numStates):
-                if state == predecessor:
-                    rho[state,predecessor] = self.alpha[state] * self.betaInv[state] #override the special case i==j
+            for successor in range(self.numStates):
+                if state == successor:
+                    rho[successor,state] = self.alpha[successor] * self.betaInv[successor] #override the special case i==j
                 else:
-                    rho[state,predecessor] = (self.alpha[state] + self.alpha[predecessor]) * self.betaInv[predecessor]
+                    rho[successor,state] = (self.alpha[successor] + self.alpha[state]) * self.betaInv[state]
         #overwrite for the predecessor states:
-        for state, predecessorsPerState in enumerate(self.predecessors):
+        for state, successorsPerState in enumerate(self.successors):
             #precedecessorcount = len(predecessorsPerState)
-            for predecessor in predecessorsPerState:
-                if state == predecessor: raise ValueError("Cannot set a state ({0}) as predecessor of itself!".format(state))
-                rho[state, predecessor] = (self.alpha[state] - (self.alpha[predecessor]/self.nu[predecessor])) * self.betaInv[predecessor]
-                stateConnectivity[state, predecessor] = 1 
+            for successor in successorsPerState:
+                if state == successor: raise ValueError("Cannot set a state ({0}) as successor of itself!".format(state))
+                rho[successor,state] = (self.alpha[successor] - (self.alpha[state]/self.nu[state])) * self.betaInv[state]
+                stateConnectivity[successor,state] = 1 
         self.rho = rho #save the final result
         self.stateConnectivity = stateConnectivity
 
@@ -230,14 +237,40 @@ class Kernel():
 
 
 
+    def updateSuccessors(self, listoflist):
+        """
+        recompute the system according to the given list of predecessors
+        """
+        self.successors=listoflist
+        self._updateRho()
 
+
+    def _predecessorListToSuccessorList(self, predecessors):
+        """ helper to convert lists of predecessor states into lists of successor states"""
+        successors = [ [] for i in range(self.numStates) ] #create a list of lists
+        for i, predecessorsPerState in enumerate(predecessors):
+            for pre in predecessorsPerState: 
+                successors[pre].append(i)
+        return successors
+    
 
     def updatePredecessors(self, listoflist):
         """
         recompute the system according to the given list of predecessors
         """
-        self.predecessors=listoflist
+        self.successors = self._predecessorListToSuccessorList(predecessors)
         self._updateRho()
+        
+    def getPredecessors(self):
+        """
+        return the predecessors
+        """
+        successors = [ [] for i in range(self.numStates) ] #create a list of lists
+        for i, predecessorsPerState in enumerate(predecessors):
+            for pre in predecessorsPerState: 
+                successors[pre].append(i)
+        return successors
+
 
     def updateB(self, successorBias):
         """
