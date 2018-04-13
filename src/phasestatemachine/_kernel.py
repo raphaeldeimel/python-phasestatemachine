@@ -51,10 +51,10 @@ class Kernel():
         
     """
     
-    def __init__(self):
+    def __init__(self, **kwargs):
          self.numStates = 0
          self.t = 0.0
-         self.setParameters()
+         self.setParameters(**kwargs)
          
 
     def setParameters(self, numStates=3, predecessors=None, successors=[[1],[2],[0]], alpha=40.0, epsilon=1e-9, nu=1.5,  beta=1.0, dt=1e-2, reset=False):
