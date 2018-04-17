@@ -27,11 +27,11 @@ predecessors = [
   [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16] #last state aggregates all branches
 ]
 
-phasta = phasestatemachine.Kernel()
-phasta.setParameters(
+phasta = phasestatemachine.Kernel(
     numStates = 18,
     predecessors = predecessors, 
-    )         
+    recordSteps=100000,
+)
 
 #set up biases so that we favor one out the 16 possible branches:
 import collections

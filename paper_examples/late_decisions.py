@@ -31,13 +31,13 @@ predecessors = [
 ]
 epsilon = 1e-6
 
-phasta = phasestatemachine.Kernel()
-phasta.setParameters(
+phasta = phasestatemachine.Kernel(
     numStates=4,
     predecessors=predecessors, 
     epsilon=epsilon, 
-    nu=7.
-    )         
+    nu=7.,
+    recordSteps=100000,
+)
 
 
 t1 = 4.0

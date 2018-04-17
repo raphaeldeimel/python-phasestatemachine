@@ -28,11 +28,11 @@ predecessors = [
   [2],   #terminal state 
 ]
 
-phasta = phasestatemachine.Kernel()
-phasta.setParameters(
+phasta = phasestatemachine.Kernel(
     numStates=4,
     predecessors=predecessors, 
-    )         
+    recordSteps=100000,
+)
 
 
 t1 = 10.0

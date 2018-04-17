@@ -33,11 +33,11 @@ predecessors = [
 #and the the third transition faster (positive exponent)
 phaseVelocityExponentsMatrix = [[0., 0., 5.],[-4,0,0.],[0., -7., 0.]]
 
-phasta = phasestatemachine.Kernel()
-phasta.setParameters(
+phasta = phasestatemachine.Kernel(
     numStates=3,
-    predecessors=predecessors, 
-    )         
+    predecessors=predecessors,
+    recordSteps=100000,
+)
 
 
 t1 = 3.2

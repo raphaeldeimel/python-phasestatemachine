@@ -54,10 +54,12 @@ class Kernel():
     def __init__(self, **kwargs):
          self.numStates = 0
          self.t = 0.0
+         self.statehistorylen = 0
+         self.historyIndex = 0
          self.setParameters(**kwargs)
          
 
-    def setParameters(self, numStates=3, predecessors=None, successors=[[1],[2],[0]], alpha=40.0, epsilon=1e-9, nu=1.5,  beta=1.0, dt=1e-2, reset=False):
+    def setParameters(self, numStates=3, predecessors=None, successors=[[1],[2],[0]], alpha=40.0, epsilon=1e-9, nu=1.5,  beta=1.0, dt=1e-2, reset=False, recordSteps=-1):
         """
         Method to set or reconfigure the phase-state-machine
         
@@ -109,12 +111,20 @@ class Kernel():
             self._biasMask = (1-_np.eye((self.numStates)))
             
             #these data structures are used to save the history of the system:
-            self.statehistory = _np.empty((100000, self.numStates+1))
-            self.statehistory.fill(_np.nan)
-            self.phasesActivationHistory= _np.zeros((100000, self.numStates,self.numStates))
-            self.phasesProgressHistory = _np.zeros((100000, self.numStates,self.numStates))
-            self.errorHistory = _np.zeros((100000))
-            self.historyIndex = -1
+            if recordSteps< 0:
+                pass
+            elif recordSteps == 0:
+                self.statehistorylen = 0
+                self.historyIndex = 0
+            else:
+                self.statehistorylen = recordSteps
+                self.statehistory = _np.empty((self.statehistorylen, self.numStates+1))
+                self.statehistory.fill(_np.nan)
+                self.phasesActivationHistory= _np.zeros((self.statehistorylen, self.numStates,self.numStates))
+                self.phasesProgressHistory = _np.zeros((self.statehistorylen, self.numStates,self.numStates))
+                self.errorHistory = _np.zeros((self.statehistorylen))
+                self.historyIndex = 0
+
 
 
     def _updateRho(self):
@@ -171,7 +181,8 @@ class Kernel():
             phaseerrors = self.phasesActivation * (self.phasesInput-self.phasesProgress)
             correctiveAction = phaseerrors * self.velocityAdjustmentGain
             statedelta = _np.sum(correctiveAction , axis=1) - _np.sum(correctiveAction, axis=0)
-            self.errorHistory[self.historyIndex] = _np.sum(correctiveAction)
+            if self.historyIndex < self.statehistorylen:
+                self.errorHistory[self.historyIndex] = _np.sum(correctiveAction)
             self.statevector = self.statevector #- 0.2 * statedelta
             mu = statedelta
 
@@ -352,6 +363,8 @@ class Kernel():
         """
         return the historic values for plotting
         """
+        if self.statehistorylen == 0:
+            raise RuntimeError("no history is being recorded")
         return  (self.statehistory[:self.historyIndex,:],
                   self.phasesActivationHistory[:self.historyIndex,:,:],
                   self.phasesProgressHistory[:self.historyIndex,:,:]
@@ -376,15 +389,12 @@ class Kernel():
         """
         internal helper to save the current state for later plotting
         """
-        self.historyIndex = self.historyIndex + 1
-        if self.statehistory.shape[0] < self.historyIndex:
-            print("(doubling history buffer)")
-            self.statehistory.append(_np.empty(self.statehistory.shape)) #double array size
-            self.phasesActivationHistory.append(_np.empty(self.phasesActivationHistory.shape))
-            self.phasesProgressHistory.append(_np.empty(self.phasesProgressHistory.shape))                
-        self.statehistory[self.historyIndex, 0] = self.t
-        self.statehistory[self.historyIndex, 1:self.numStates+1] = self.statevector
-        self.phasesActivationHistory[self.historyIndex, :,:] = self.phasesActivation
-        self.phasesProgressHistory[self.historyIndex, :,:] = self.phasesProgress
+        if self.historyIndex < self.statehistorylen:
+            self.statehistory[self.historyIndex, 0] = self.t
+            self.statehistory[self.historyIndex, 1:self.numStates+1] = self.statevector
+            self.phasesActivationHistory[self.historyIndex, :,:] = self.phasesActivation
+            self.phasesProgressHistory[self.historyIndex, :,:] = self.phasesProgress
+        if self.historyIndex < self.statehistorylen:
+            self.historyIndex = self.historyIndex + 1
 
 

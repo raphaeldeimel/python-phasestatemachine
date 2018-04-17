@@ -30,11 +30,11 @@ predecessors = [
   [1] 
 ]
 
-phasta = phasestatemachine.Kernel()
-phasta.setParameters(
+phasta = phasestatemachine.Kernel(
     numStates = 3,
     predecessors = predecessors, 
-    )         
+    recordSteps = 10000,
+)
 
 
 t1 = 5.0

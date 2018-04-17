@@ -31,11 +31,11 @@ predecessors = [
 
 
 
-phasta = phasestatemachine.Kernel()
-phasta.setParameters(
+phasta = phasestatemachine.Kernel(
     numStates=3,
     predecessors=predecessors,
-    )         
+    recordSteps=100000,
+)
 
 #phasta.updateTransitionTriggerInput(1e-10)
 
