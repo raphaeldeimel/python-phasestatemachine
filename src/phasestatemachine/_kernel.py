@@ -107,6 +107,7 @@ class Kernel():
             self.phasesActivation = _np.zeros((self.numStates,self.numStates))
             self.phasesActivationBeta = _np.zeros((self.numStates,self.numStates))
             self.phasesProgress = _np.zeros((self.numStates,self.numStates))
+            self.phasesProgressVelocities = _np.zeros((self.numStates,self.numStates))
             self.biases = _np.zeros((self.numStates, self.numStates))
             self._biasMask = (1-_np.eye((self.numStates)))
             
@@ -214,7 +215,9 @@ class Kernel():
             
             #compute the phase progress matrix (Psi)
             s_square = s.repeat(len(statevector_normalized), axis=1)
-            self.phasesProgress = betainc(self.nonlinearityParamsPsi[0],self.nonlinearityParamsPsi[1], _np.clip(0.5 + 0.5 * ( s_square - s_square.T), 0.0, 1.0))
+            newphases = betainc(self.nonlinearityParamsPsi[0],self.nonlinearityParamsPsi[1], _np.clip(0.5 + 0.5 * ( s_square - s_square.T), 0.0, 1.0))
+            self.phasesProgressVelocities = (newphases - self.phasesProgress) * self.dtInv
+            self.phasesProgress = newphases
 
             #note the currently most active state/transition (for informative purposes)
             i = _np.argmax(self.phasesActivation)
