@@ -9,10 +9,44 @@ This file contains the main code for the phase-state machine
 """
 import numpy as _np
 import pandas as _pd
-from scipy.special import expit, betainc
 import itertools
 from numba import jit
-from . import _kumaraswamy
+
+
+@jit
+def _limit(a, lower=0.0, upper=1.0):
+    """ 
+    faster version of numpy clip, also modify array in place
+    """
+#        a = _np.clip(a, lower, upper)
+    a[a<lower]=lower
+    a[a>upper]=upper
+
+@jit
+def _kumaraswamy(a, b, x):
+    """
+    in-place computation of the cumulative density function of the Kumaraswamy distribution
+    
+    a,b: parameters of the distribution
+    
+    """
+    x = 1.0-(1.0-x**a)**b
+    x[x < 0.0]  = 0.0
+    x[x > 1.0]  = 1.0
+    return
+
+import scipy.special as _scipyspecial
+def _betainc(a, b, x):
+    """
+    in-place computation of the cumulative density function of the beta distribution
+    
+    a,b: parameters of the distribution
+    
+    """
+    x = _scipyspecial.betainc(a,b,x)
+    return
+    
+
 
 class Kernel():
     """
@@ -100,15 +134,18 @@ class Kernel():
         else:
             self.successors = successors
         
-        #select the nonlinearities
-        if nonlinearityLambda=='beta25':
-            self._nonlinearityFuncLambda = self._nonlinearityFuncBetaInc25
-        else:
-            self._nonlinearityFuncLambda = _nonlinearityFuncKumaraswamy25
-        if nonlinearityPsi=='beta33':
-            self._nonlinearityFuncPsi = self._nonlinearityFuncBetaInc33
-        else:
-            self._nonlinearityFuncPsi = _nonlinearityFuncKumaraswamy33
+        self.nonlinearityParamsLambda = (2,5)    #parameters of the beta distribution nonlinearity for computing the Lambda matrix values 
+        self.nonlinearityParamsPsi    = (3,3)    #parameters of the beta distribution nonlinearity that linearizes phase variables 
+        
+        #select the nonlinearities to use
+        nonlinearityfunctions = {
+            'beta25': lambda x: _betainc(2,5,x),
+            'beta33': lambda x: _betainc(3,3,x),
+            'kumaraswamy25': lambda x: _kumaraswamy(2,5,x),
+            'kumaraswamy33': lambda x: _kumaraswamy(3,3,x),
+        }
+        self._nonlinearityFuncLambda = nonlinearityfunctions[nonlinearityLambda]
+        self._nonlinearityFuncPsi = nonlinearityfunctions[nonlinearityPsi]
         
         self.activationThreshold = 0.05          #clip very small activations below this value to avoid barely activated states
 
@@ -178,26 +215,6 @@ class Kernel():
 
 
 
-    def _nonlinearityFuncBetaInc25(self,x):
-        return betainc(2,5,x)
-
-    def _nonlinearityFuncBetaInc33(self,x):
-        return betainc(2,5,x)
-
-    def _nonlinearityFuncKumaraswamy25(self,x):
-        return _kumaraswamy.cdf(2,5,x)
-
-    def _nonlinearityFuncKumaraswamy33(self,x):
-        return _kumaraswamy.cdf(3,3,x)
-
-    @jit
-    def _limit(self, a, lower=0.0, upper=1.0):
-        """ 
-        faster version of numpy clip, also modify array in place
-        """
-#        a = _np.clip(a, lower, upper)
-        a[a<lower]=lower
-        a[a>upper]=upper
 
 
     def step(self, period=None, until=None):
@@ -245,15 +262,22 @@ class Kernel():
             #compute the transition/state activation matrix (Lambda)
             s = statevector_normalized.reshape((-1,1))  #creates a proper row vector
             phasesActivation = 4 * _np.dot(s, s.T) * self.stateConnectivity 
-            phasesActivation = betainc(self.nonlinearityParamsLambda[0],self.nonlinearityParamsLambda[1], _np.clip(phasesActivation,0,1))
-            phasesActivation = _np.clip( (phasesActivation - self.activationThreshold) / (1.0 - 2*self.activationThreshold) , 0, 1)  #makes sure that we numerically saturate and avoid very small, residual activations
+            phasesActivation = _np.clip(phasesActivation,0,1)
+            _limit(phasesActivation)
+            self._nonlinearityFuncLambda(phasesActivation)
+            phasesActivation = (phasesActivation - self.activationThreshold) / (1.0 - 2*self.activationThreshold) #makes sure that we numerically saturate and avoid very small, residual activations
+            _limit(phasesActivation) 
             
             #compute the state activation and put it into the diagonal of Lambda:
-            self.phasesActivation = phasesActivation  + _np.clip( _np.diag(statevector_normalized**2) * (1.0-_np.sum(phasesActivation)), 0,1)
+            stateActivations = _np.diag(statevector_normalized**2) * (1.0-_np.sum(phasesActivation))
+            _limit(stateActivations)
+            self.phasesActivation = phasesActivation  + stateActivations
             
             #compute the phase progress matrix (Psi)
             s_square = s.repeat(len(statevector_normalized), axis=1)
-            newphases = betainc(self.nonlinearityParamsPsi[0],self.nonlinearityParamsPsi[1], _np.clip(0.5 + 0.5 * ( s_square - s_square.T), 0.0, 1.0))
+            newphases = 0.5 + 0.5 * ( s_square - s_square.T)
+            _limit(newphases)
+            self._nonlinearityFuncPsi(newphases) 
             self.phasesProgressVelocities = (newphases - self.phasesProgress) * self.dtInv
             self.phasesProgress = newphases
 
@@ -266,7 +290,6 @@ class Kernel():
             self._recordState()
             return self.statevector
             
-
 
 
     def get1DState(self):
