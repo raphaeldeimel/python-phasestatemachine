@@ -18,7 +18,6 @@ def _limit(a, lower=0.0, upper=1.0):
     """ 
     faster version of numpy clip, also modify array in place
     """
-#        a = _np.clip(a, lower, upper)
     a[a<lower]=lower
     a[a>upper]=upper
 
@@ -262,11 +261,9 @@ class Kernel():
             #compute the transition/state activation matrix (Lambda)
             s = statevector_normalized.reshape((-1,1))  #creates a proper row vector
             phasesActivation = 4 * _np.dot(s, s.T) * self.stateConnectivity 
-            phasesActivation = _np.clip(phasesActivation,0,1)
+            phasesActivation = (phasesActivation - self.activationThreshold) / (1.0 - 2*self.activationThreshold) #makes sure that we numerically saturate and avoid very small, residual activations
             _limit(phasesActivation)
             self._nonlinearityFuncLambda(phasesActivation)
-            phasesActivation = (phasesActivation - self.activationThreshold) / (1.0 - 2*self.activationThreshold) #makes sure that we numerically saturate and avoid very small, residual activations
-            _limit(phasesActivation) 
             
             #compute the state activation and put it into the diagonal of Lambda:
             stateActivations = _np.diag(statevector_normalized**2) * (1.0-_np.sum(phasesActivation))
