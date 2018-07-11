@@ -11,7 +11,8 @@ import numpy as _np
 import pandas as _pd
 from scipy.special import expit, betainc
 import itertools
-
+from numba import jit
+from . import _kumaraswamy
 
 class Kernel():
     """
@@ -59,7 +60,19 @@ class Kernel():
          self.setParameters(**kwargs)
          
 
-    def setParameters(self, numStates=3, predecessors=None, successors=[[1],[2],[0]], alpha=40.0, epsilon=1e-9, nu=1.5,  beta=1.0, dt=1e-2, reset=False, recordSteps=-1):
+    def setParameters(self, 
+            numStates=3, 
+            predecessors=None, 
+            successors=[[1],[2],[0]], 
+            alpha=40.0, 
+            epsilon=1e-9, 
+            nu=1.5,  
+            beta=1.0, 
+            dt=1e-2, 
+            nonlinearityLambda='beta25',
+            nonlinearityPsi='beta33',
+            reset=False, 
+            recordSteps=-1):
         """
         Method to set or reconfigure the phase-state-machine
         
@@ -86,9 +99,17 @@ class Kernel():
             self.successors = self._predecessorListToSuccessorList(predecessors)
         else:
             self.successors = successors
-            
-        self.nonlinearityParamsLambda = (2,5)    #parameters of the beta distribution nonlinearity for computing the Lambda matrix values
-        self.nonlinearityParamsPsi    = (3,3)    #parameters of the beta distribution nonlinearity that linearizes phase variables
+        
+        #select the nonlinearities
+        if nonlinearityLambda=='beta25':
+            self._nonlinearityFuncLambda = self._nonlinearityFuncBetaInc25
+        else:
+            self._nonlinearityFuncLambda = _nonlinearityFuncKumaraswamy25
+        if nonlinearityPsi=='beta33':
+            self._nonlinearityFuncPsi = self._nonlinearityFuncBetaInc33
+        else:
+            self._nonlinearityFuncPsi = _nonlinearityFuncKumaraswamy33
+        
         self.activationThreshold = 0.05          #clip very small activations below this value to avoid barely activated states
 
         #inputs:
@@ -157,9 +178,26 @@ class Kernel():
 
 
 
+    def _nonlinearityFuncBetaInc25(self,x):
+        return betainc(2,5,x)
 
+    def _nonlinearityFuncBetaInc33(self,x):
+        return betainc(2,5,x)
 
+    def _nonlinearityFuncKumaraswamy25(self,x):
+        return _kumaraswamy.cdf(2,5,x)
 
+    def _nonlinearityFuncKumaraswamy33(self,x):
+        return _kumaraswamy.cdf(3,3,x)
+
+    @jit
+    def _limit(self, a, lower=0.0, upper=1.0):
+        """ 
+        faster version of numpy clip, also modify array in place
+        """
+#        a = _np.clip(a, lower, upper)
+        a[a<lower]=lower
+        a[a>upper]=upper
 
 
     def step(self, period=None, until=None):
