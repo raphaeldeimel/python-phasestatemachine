@@ -117,7 +117,13 @@ def _step(statevector,  #modified in-place
         return
         
 
-    
+#values for the Kumaraswamy CDF that approximate the given incomplete beta function:
+_approximatedBetaInc = {
+    'beta2,2': (1.913227338072261,2.2301669931409323),
+    'beta3,3': (2.561444544688591,3.680069490606511),
+    'beta2,5': (1.6666251656562021,5.9340642444701555),
+}
+
 
 
 class Kernel():
@@ -206,10 +212,11 @@ class Kernel():
         else:
             self.successors = successors
         
-        self.nonlinearityParamsLambda = (2,5)    #parameters of the beta distribution nonlinearity for computing the Lambda matrix values 
-        self.nonlinearityParamsPsi  = (2.7,4)      #parameters of the beta distribution nonlinearity that linearizes phase variables 
+        
+        self.nonlinearityParamsLambda = _approximatedBetaInc['beta2,5']   #nonlinearity for sparsifying activation values
+        self.nonlinearityParamsPsi  = _approximatedBetaInc['beta3,3']     #nonlinearity that linearizes phase variables 
 
-        self.activationThreshold = 0.05          #clip very small activations below this value to avoid barely activated states
+        self.activationThreshold = 0.01          #clip very small activations below this value to avoid barely activated states
 
         #inputs:
         self.BiasMatrix = _np.zeros((self.numStates,self.numStates)) #determines transition preferences and state timeout duration
@@ -225,7 +232,6 @@ class Kernel():
             self.dotstatevector = _np.zeros((numStates))
             self.statevector[0] = self.beta[0] #start at state 0
             self.phasesActivation = _np.zeros((self.numStates,self.numStates))
-            self.phasesActivationBeta = _np.zeros((self.numStates,self.numStates))
             self.phasesProgress = _np.zeros((self.numStates,self.numStates))
             self.phasesProgressVelocities = _np.zeros((self.numStates,self.numStates))
             self.biases = _np.zeros((self.numStates, self.numStates))
