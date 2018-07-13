@@ -294,7 +294,7 @@ class Kernel():
                 until = self.t + period - 0.5*self.dt
             if until is not None: 
                 while self.t < until:
-                    return  self._step()
+                    return  self.step()
             
             #execute a single step:
             self.t = self.t + self.dt #advance time
