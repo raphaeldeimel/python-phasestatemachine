@@ -9,8 +9,121 @@ This file contains the main code for the phase-state machine
 """
 import numpy as _np
 import pandas as _pd
-from scipy.special import expit, betainc
 import itertools
+from numba import jit
+
+
+@jit(nopython=True)
+def _limit(a):
+    """ 
+    faster version of numpy clip, also modifies array in place
+    """
+    #numba doesn't support indexing by boolean
+    #a[a<lower]=lower
+    #a[a>upper]=upper
+    shape = a.shape
+    for j in range(shape[1]):
+        for i in range(shape[0]):
+            if a[i,j] < 0.0:
+                a[i,j] = 0.0
+            if  a[i,j] > 1.0:
+                a[i,j] = 1.0
+
+
+@jit(nopython=True)
+def _step(statevector,  #modified in-place
+          dotstatevector, #modified in-place 
+          phasesActivation, #modified in-place 
+          phasesProgress,  #modified in-place
+          phasesProgressVelocities, #modified in-place 
+          #inputs:
+          phaseVelocityExponentInput, 
+          BiasMatrix, 
+          phasesInput, 
+          velocityAdjustmentGain, 
+          noise_velocity,
+          #parameters:
+          numStates, 
+          betaInv, 
+          stateConnectivity, 
+          activationThreshold, 
+          rho, 
+          alpha, 
+          dt, 
+          dtInv, 
+          nonlinearityParamsLambda,
+          nonlinearityParamsPsi,
+          ):
+        """
+        Core phase-state machine computation.
+
+        Written as a function in order to be able to optimize it with numba
+        
+        the function modifies several arguments (numpy arrays) in place.
+        """
+        #compute adjustment to the instantaneously effective growth factor
+        kd = 2**_np.sum(phasesActivation * phaseVelocityExponentInput) 
+        
+        #compute mu for phase control:
+        phaseerrors = phasesActivation * (phasesInput-phasesProgress)
+        correctiveAction = phaseerrors * velocityAdjustmentGain
+        correctiveActionPredecessor = _np.zeros((numStates))
+        for i in range(numStates):
+            correctiveActionPredecessor += correctiveAction[:,i]
+        correctiveActionSuccessor = _np.zeros((numStates))
+        for i in range(numStates):
+            correctiveActionSuccessor += correctiveAction[i,:]
+        mu = correctiveActionPredecessor - correctiveActionSuccessor
+
+
+        #compute which transition biases should be applied right now:
+        biases = _np.dot(BiasMatrix, statevector)
+
+        
+        #This is the core computation and time integration of the dynamical system:
+        growth = alpha - _np.dot(rho, statevector)
+        velocity = statevector * growth * kd  + mu  #estimate velocity
+        dotstatevector[:] = velocity + noise_velocity + biases
+        statevector[:] = _np.maximum(statevector + dotstatevector*dt , 0) #set the new state and also ensure nonegativity
+
+        #prepare a normalized state vector for the subsequent operations:
+        statevector_normalized = statevector*betaInv
+
+        #create a proper 2D array of the state vector for numpy functions to work as we need it:
+        s = _np.empty((numStates, 1))
+        s[:,0] = statevector_normalized 
+
+        #compute the transition/state activation matrix (Lambda)
+        phasesActivation[:,:] = 4 * _np.dot(s, s.T) * stateConnectivity 
+        phasesActivation[:,:] = (phasesActivation - activationThreshold) / (1.0 - 2*activationThreshold) #makes sure that we numerically saturate and avoid very small, residual activations
+        _limit(phasesActivation)
+        #apply nonlinearity:
+        phasesActivation[:,:] = 1.0-(1.0-phasesActivation**nonlinearityParamsLambda[0])**nonlinearityParamsLambda[1] #Kumaraswamy CDF
+        
+        #compute the state activation and put it into the diagonal of Lambda:
+        stateActivations = _np.diag(statevector_normalized**2) * (1.0-_np.sum(phasesActivation))
+        _limit(stateActivations)
+        phasesActivation[:,:] += stateActivations
+        
+        #compute the phase progress matrix (Psi)
+        newphases = 0.5 + 0.5 * (s-s.T)  #note: s and s.T get broadcasted to square shape
+        _limit(newphases)
+        #apply nonlinearity:
+        newphases = 1.0-(1.0-newphases**nonlinearityParamsPsi[0])**nonlinearityParamsPsi[1] #Kumaraswamy CDF
+        
+        phasesProgressVelocities[:,:] = (newphases - phasesProgress) * dtInv
+        phasesProgress[:,:] = newphases
+
+        return
+        
+
+#values for the Kumaraswamy CDF that approximate the given incomplete beta function:
+_approximatedBetaInc = {
+    'beta2,2': (1.913227338072261,2.2301669931409323),
+    'beta3,3': (2.561444544688591,3.680069490606511),
+    'beta2,5': (1.6666251656562021,5.9340642444701555),
+}
+
 
 
 class Kernel():
@@ -59,7 +172,19 @@ class Kernel():
          self.setParameters(**kwargs)
          
 
-    def setParameters(self, numStates=3, predecessors=None, successors=[[1],[2],[0]], alpha=40.0, epsilon=1e-9, nu=1.5,  beta=1.0, dt=1e-2, reset=False, recordSteps=-1):
+    def setParameters(self, 
+            numStates=3, 
+            predecessors=None, 
+            successors=[[1],[2],[0]], 
+            alpha=40.0, 
+            epsilon=1e-9, 
+            nu=1.5,  
+            beta=1.0, 
+            dt=1e-2, 
+            nonlinearityLambda='beta25',
+            nonlinearityPsi='beta33',
+            reset=False, 
+            recordSteps=-1):
         """
         Method to set or reconfigure the phase-state-machine
         
@@ -86,10 +211,12 @@ class Kernel():
             self.successors = self._predecessorListToSuccessorList(predecessors)
         else:
             self.successors = successors
-            
-        self.nonlinearityParamsLambda = (2,5)    #parameters of the beta distribution nonlinearity for computing the Lambda matrix values
-        self.nonlinearityParamsPsi    = (3,3)    #parameters of the beta distribution nonlinearity that linearizes phase variables
-        self.activationThreshold = 0.05          #clip very small activations below this value to avoid barely activated states
+        
+        
+        self.nonlinearityParamsLambda = _approximatedBetaInc['beta2,5']   #nonlinearity for sparsifying activation values
+        self.nonlinearityParamsPsi  = _approximatedBetaInc['beta3,3']     #nonlinearity that linearizes phase variables 
+
+        self.activationThreshold = 0.01          #clip very small activations below this value to avoid barely activated states
 
         #inputs:
         self.BiasMatrix = _np.zeros((self.numStates,self.numStates)) #determines transition preferences and state timeout duration
@@ -105,7 +232,6 @@ class Kernel():
             self.dotstatevector = _np.zeros((numStates))
             self.statevector[0] = self.beta[0] #start at state 0
             self.phasesActivation = _np.zeros((self.numStates,self.numStates))
-            self.phasesActivationBeta = _np.zeros((self.numStates,self.numStates))
             self.phasesProgress = _np.zeros((self.numStates,self.numStates))
             self.phasesProgressVelocities = _np.zeros((self.numStates,self.numStates))
             self.biases = _np.zeros((self.numStates, self.numStates))
@@ -123,7 +249,6 @@ class Kernel():
                 self.statehistory.fill(_np.nan)
                 self.phasesActivationHistory= _np.zeros((self.statehistorylen, self.numStates,self.numStates))
                 self.phasesProgressHistory = _np.zeros((self.statehistorylen, self.numStates,self.numStates))
-                self.errorHistory = _np.zeros((self.statehistorylen))
                 self.historyIndex = 0
 
 
@@ -159,9 +284,6 @@ class Kernel():
 
 
 
-
-
-
     def step(self, period=None, until=None):
             """
             Main algorithm, implementing the integration step, state space decomposition, phase control and velocity adjustment.
@@ -169,65 +291,48 @@ class Kernel():
             """
             #if a period is given, iterate until we finished that period:            
             if period is not None:
-                endtime = self.t + period - 0.5*self.dt
-                while self.t < endtime:
-                    self.step(period=None, until=until)
+                until = self.t + period - 0.5*self.dt
             if until is not None: 
                 while self.t < until:
-                    self.step()
-
-            kd = 2**_np.sum(self.phasesActivation * self.phaseVelocityExponentInput) #compute adjustment to the instantaneously effective growth factor
+                    return  self._step()
             
-            #compute mu for phase control:
-            phaseerrors = self.phasesActivation * (self.phasesInput-self.phasesProgress)
-            correctiveAction = phaseerrors * self.velocityAdjustmentGain
-            statedelta = _np.sum(correctiveAction , axis=1) - _np.sum(correctiveAction, axis=0)
-            if self.historyIndex < self.statehistorylen:
-                self.errorHistory[self.historyIndex] = _np.sum(correctiveAction)
-            self.statevector = self.statevector #- 0.2 * statedelta
-            mu = statedelta
-
-            noise_velocity = _np.random.normal(scale = self.epsilonPerDt, size=self.numStates) #discretized wiener process noise
-
-            #compute which transition biases should be applied right now:
-            self.biases = _np.dot(self.BiasMatrix, self.statevector)
-
-            
-            #This is the core computation and time integration of the dynamical system:
-            growth = self.alpha - _np.dot(self.rho, self.statevector)
-            velocity = self.statevector * growth * kd  + mu  #estimate velocity
-            self.dotstatevector = velocity + noise_velocity + self.biases
-            self.statevector = _np.maximum(self.statevector + self.dotstatevector*self.dt , 0) #set the new state and also ensure nonegativity
-            
+            #execute a single step:
             self.t = self.t + self.dt #advance time
-
-            #prepare a normalized state vector for the subsequent operations:
-            statevector_normalized = self.statevector*self.betaInv
-
-            #compute the transition/state activation matrix (Lambda)
-            s = statevector_normalized.reshape((-1,1))  #creates a proper row vector
-            phasesActivation = 4 * _np.dot(s, s.T) * self.stateConnectivity 
-            phasesActivation = betainc(self.nonlinearityParamsLambda[0],self.nonlinearityParamsLambda[1], _np.clip(phasesActivation,0,1))
-            phasesActivation = _np.clip( (phasesActivation - self.activationThreshold) / (1.0 - 2*self.activationThreshold) , 0, 1)  #makes sure that we numerically saturate and avoid very small, residual activations
+            noise_velocity = _np.random.normal(scale = self.epsilonPerDt, size=self.numStates) #sample a discretized wiener process noise
             
-            #compute the state activation and put it into the diagonal of Lambda:
-            self.phasesActivation = phasesActivation  + _np.clip( _np.diag(statevector_normalized**2) * (1.0-_np.sum(phasesActivation)), 0,1)
-            
-            #compute the phase progress matrix (Psi)
-            s_square = s.repeat(len(statevector_normalized), axis=1)
-            newphases = betainc(self.nonlinearityParamsPsi[0],self.nonlinearityParamsPsi[1], _np.clip(0.5 + 0.5 * ( s_square - s_square.T), 0.0, 1.0))
-            self.phasesProgressVelocities = (newphases - self.phasesProgress) * self.dtInv
-            self.phasesProgress = newphases
+            _step(  #arrays modified in-place:
+                    self.statevector, 
+                    self.dotstatevector,
+                    self.phasesActivation, 
+                    self.phasesProgress, 
+                    self.phasesProgressVelocities, 
+                    #inputs
+                    self.phaseVelocityExponentInput, 
+                    self.BiasMatrix, 
+                    self.phasesInput, 
+                    self.velocityAdjustmentGain, 
+                    noise_velocity,
+                    #parameters
+                    self.numStates, 
+                    self.betaInv , 
+                    self.stateConnectivity, 
+                    self.activationThreshold, 
+                    self.rho, 
+                    self.alpha, 
+                    self.dt,
+                    self.dtInv, 
+                    self.nonlinearityParamsLambda,
+                    self.nonlinearityParamsPsi,
+            )
 
             #note the currently most active state/transition (for informative purposes)
             i = _np.argmax(self.phasesActivation)
             self.currentPredecessor = i % self.numStates
             self.currentSuccessor = i // self.numStates
 
-
             self._recordState()
             return self.statevector
-            
+
 
 
 
