@@ -198,21 +198,18 @@ class Kernel():
         """
         oldcount = self.numStates
         #parameters:
-        self.dt=dt
-        self.dtInv=1./dt
         self.numStates = numStates
         self.alpha = self._sanitizeParam(alpha)
         self.beta = self._sanitizeParam(beta)
         self.betaInv = 1.0/self.beta             #this is used often, so precompute once
         self.nu = self._sanitizeParam(nu)
-        self.epsilon = self._sanitizeParam(epsilon) * self.beta #wiener process noise
-        self.epsilonPerDt = self.epsilon *_np.sqrt(self.dt)/dt #factor accounts for the accumulation during a time step
+        self.epsilon = self._sanitizeParam(epsilon) * self.beta #Wiener process noise
+        self.updateDt(dt)
 
         if predecessors is not None:  #convert list of predecessors into list of successors
             self.successors = self._predecessorListToSuccessorList(predecessors)
         else:
             self.successors = successors
-        
         
         self.nonlinearityParamsLambda = _approximatedBetaInc['beta2,5']   #nonlinearity for sparsifying activation values
         self.nonlinearityParamsPsi  = _approximatedBetaInc['beta3,3']     #nonlinearity that linearizes phase variables 
@@ -285,46 +282,56 @@ class Kernel():
 
 
 
-    def step(self, period=None, until=None):
+    def step(self, until=None, period=None, nr_steps=1):
             """
             Main algorithm, implementing the integration step, state space decomposition, phase control and velocity adjustment.
             
+            period: give a period to simulate 
+            
+            until: give a time until to simulate 
+                        
+            nr_steps: give the number of steps to simulate at self.dt
+            
+            If more than one argument is given, then precedence is: until > period > nr_steps
+            
             """
+            if until is not None: 
+                period = until - self.t
+                if period < 0.0:
+                    raise RuntimeError("argument until is in the past")
             #if a period is given, iterate until we finished that period:            
             if period is not None:
-                until = self.t + period - 0.5*self.dt
-            if until is not None: 
-                while self.t < until:
-                    return  self.step()
+                nr_steps = int(period // self.dt)
             
-            #execute a single step:
-            self.t = self.t + self.dt #advance time
-            noise_velocity = _np.random.normal(scale = self.epsilonPerDt, size=self.numStates) #sample a discretized wiener process noise
-            
-            _step(  #arrays modified in-place:
-                    self.statevector, 
-                    self.dotstatevector,
-                    self.phasesActivation, 
-                    self.phasesProgress, 
-                    self.phasesProgressVelocities, 
-                    #inputs
-                    self.phaseVelocityExponentInput, 
-                    self.BiasMatrix, 
-                    self.phasesInput, 
-                    self.velocityAdjustmentGain, 
-                    noise_velocity,
-                    #parameters
-                    self.numStates, 
-                    self.betaInv , 
-                    self.stateConnectivity, 
-                    self.activationThreshold, 
-                    self.rho, 
-                    self.alpha, 
-                    self.dt,
-                    self.dtInv, 
-                    self.nonlinearityParamsLambda,
-                    self.nonlinearityParamsPsi,
-            )
+            print(nr_steps, self.dt)
+            for i in range(nr_steps):
+                #execute a single step:
+                self.t = self.t + self.dt #advance time
+                noise_velocity = _np.random.normal(scale = self.epsilonPerDt, size=self.numStates) #sample a discretized wiener process noise
+                _step(  #arrays modified in-place:
+                        self.statevector, 
+                        self.dotstatevector,
+                        self.phasesActivation, 
+                        self.phasesProgress, 
+                        self.phasesProgressVelocities, 
+                        #inputs
+                        self.phaseVelocityExponentInput, 
+                        self.BiasMatrix, 
+                        self.phasesInput, 
+                        self.velocityAdjustmentGain, 
+                        noise_velocity,
+                        #parameters
+                        self.numStates, 
+                        self.betaInv , 
+                        self.stateConnectivity, 
+                        self.activationThreshold, 
+                        self.rho, 
+                        self.alpha, 
+                        self.dt,
+                        self.dtInv, 
+                        self.nonlinearityParamsLambda,
+                        self.nonlinearityParamsPsi,
+                )
 
             #note the currently most active state/transition (for informative purposes)
             i = _np.argmax(self.phasesActivation)
@@ -355,8 +362,22 @@ class Kernel():
             return "{0}->{1}".format(self.currentPredecessor , self.currentSuccessor)
 
 
+    def updateDt(self, dt):
+        """
+        upadate the time step used to integrate the dynamical system:
+        """
+        self.dt  = dt
+        self.dtInv = 1.0 / dt
+        self.epsilonPerDt = self.epsilon *_np.sqrt(self.dt)/dt  #factor accounts for the accumulation during a time step (assuming a Wiener process)
 
-
+    def updateEpsilon(self, epsilon):
+        """
+        Update the noise vector
+        """
+        self.epsilon = epsilon
+        self.updateDt(self.dt) #need to recompute epsilonPerDt
+        
+ 
     def updateSuccessors(self, listoflist):
         """
         recompute the system according to the given list of predecessors
