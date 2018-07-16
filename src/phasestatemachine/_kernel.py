@@ -303,7 +303,6 @@ class Kernel():
             if period is not None:
                 nr_steps = int(period // self.dt)
             
-            print(nr_steps, self.dt)
             for i in range(nr_steps):
                 #execute a single step:
                 self.t = self.t + self.dt #advance time
