@@ -503,7 +503,7 @@ class Kernel():
         """
         internal helper to provide robust handling of lists and numpy array input data
         """
-        if (type(p) is float) or (type(p) is int):
+        if  _np.isscalar(p):
             sanitizedP = _np.empty((self.numStates))
             sanitizedP.fill(float(p))
         else:
