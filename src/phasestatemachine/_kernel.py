@@ -120,6 +120,7 @@ def _step(statevector,  #modified in-place
 #values for the Kumaraswamy CDF that approximate the given incomplete beta function:
 _approximatedBetaInc = {
     'beta1,1': (1.,1.),
+    'beta2,1': (2.,1.),
     'beta2,2': (1.913227338072261,2.2301669931409323),
     'beta3,3': (2.561444544688591,3.680069490606511),
     'beta2,5': (1.6666251656562021,5.9340642444701555),
