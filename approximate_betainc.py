@@ -50,7 +50,7 @@ def approximate(beta_target_a, beta_target_b, n=100, accuracy=2e-3):
         step_a_ = numpy.random.random() * epsilon_  - _np.sum(error_[:na]) * (1000 / (1000+i))
         step_b_ = numpy.random.random() * epsilon_  - _np.sum(error_[nb:]) * (1000 / (1000+i))
         a_proposed = a_ + step_a_
-        b_proposed = b_ + step_b_
+        b_proposed = _np.clip(b_ + step_b_, 0.0, _np.inf)
         cdf_proposed = kumaraswamy(a_proposed, b_proposed, x)
         error = (cdf_proposed - cdf_target)**2
         costs_proposed = _np.sum( error )
