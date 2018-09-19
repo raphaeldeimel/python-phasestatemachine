@@ -94,7 +94,7 @@ def _step(statevector,  #modified in-place
         s[:,0] = statevector_normalized 
 
         #compute the transition/state activation matrix (Lambda)
-        phasesActivation[:,:] = 4 * _np.dot(s, s.T) * stateConnectivity 
+        phasesActivation[:,:] = 2 * _np.dot(s, s.T) / _np.sum(s**2) * stateConnectivity 
         phasesActivation[:,:] = (phasesActivation - activationThreshold) / (1.0 - 2*activationThreshold) #makes sure that we numerically saturate and avoid very small, residual activations
         _limit(phasesActivation)
         #apply nonlinearity:
