@@ -179,12 +179,13 @@ class Kernel():
             predecessors=None, 
             successors=[[1],[2],[0]], 
             alpha=40.0, 
-            epsilon=1e-9, 
+            epsilon=1e-9,
             nu=1.5,  
             beta=1.0, 
             dt=1e-2, 
             nonlinearityLambda='beta25',
             nonlinearityPsi='beta33',
+            reuseNoiseSampleTimes = 10,
             reset=False, 
             recordSteps=-1):
         """
@@ -205,6 +206,7 @@ class Kernel():
         self.betaInv = 1.0/self.beta             #this is used often, so precompute once
         self.nu = self._sanitizeParam(nu)
         self.epsilon = self._sanitizeParam(epsilon) * self.beta #Wiener process noise
+        self.reuseNoiseSampleTimes = reuseNoiseSampleTimes
         self.updateDt(dt)
 
         if predecessors is not None:  #convert list of predecessors into list of successors
@@ -235,7 +237,8 @@ class Kernel():
             self.phasesProgressVelocities = _np.zeros((self.numStates,self.numStates))
             self.biases = _np.zeros((self.numStates, self.numStates))
             self._biasMask = (1-_np.eye((self.numStates)))
-            
+            self.noise_velocity = 0.0
+            self.noiseValidCounter = 0
             #these data structures are used to save the history of the system:
             if recordSteps< 0:
                 pass
@@ -269,7 +272,7 @@ class Kernel():
                     rho[successor,state] = self.alpha[successor] * self.betaInv[successor] #override the special case i==j
                 else:
                     rho[successor,state] = (self.alpha[successor] + self.alpha[state]) * self.betaInv[state]
-        #overwrite for the predecessor states:
+        #overwrite for the successor states:
         for state, successorsPerState in enumerate(self.successors):
             #precedecessorcount = len(predecessorsPerState)
             for successor in successorsPerState:
@@ -307,7 +310,10 @@ class Kernel():
             for i in range(nr_steps):
                 #execute a single step:
                 self.t = self.t + self.dt #advance time
-                noise_velocity = _np.random.normal(scale = self.epsilonPerDt, size=self.numStates) #sample a discretized wiener process noise
+                self.noiseValidCounter = self.noiseValidCounter - 1
+                if self.noiseValidCounter <= 0: #do not sample every timestep as the dynamical system cannot react that fast anyway. Effectively low-pass-filters the noise.
+                    self.noise_velocity = _np.random.normal(scale = self.epsilonPerSample, size=self.numStates) #sample a discretized wiener process noise
+                    self.noiseValidCounter = self.reuseNoiseSampleTimes
                 _step(  #arrays modified in-place:
                         self.statevector, 
                         self.dotstatevector,
@@ -319,7 +325,7 @@ class Kernel():
                         self.BiasMatrix, 
                         self.phasesInput, 
                         self.velocityAdjustmentGain, 
-                        noise_velocity,
+                        self.noise_velocity,
                         #parameters
                         self.numStates, 
                         self.betaInv , 
@@ -368,14 +374,14 @@ class Kernel():
         """
         self.dt  = dt
         self.dtInv = 1.0 / dt
-        self.epsilonPerDt = self.epsilon *_np.sqrt(self.dt)/dt  #factor accounts for the accumulation during a time step (assuming a Wiener process)
+        self.epsilonPerSample = self.epsilon *_np.sqrt(self.dt*self.reuseNoiseSampleTimes)/dt  #factor accounts for the accumulation during a time step (assuming a Wiener process)
 
     def updateEpsilon(self, epsilon):
         """
         Update the noise vector
         """
         self.epsilon = epsilon
-        self.updateDt(self.dt) #need to recompute epsilonPerDt
+        self.updateDt(self.dt) #need to recompute self.epsilonPerSample
         
  
     def updateSuccessors(self, listoflist):
