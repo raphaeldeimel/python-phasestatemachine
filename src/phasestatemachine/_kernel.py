@@ -435,10 +435,14 @@ class Kernel():
         successorBias: matrix of biases for each (successor state, current state) 
        
         Note: states cannot be their own successors, so these values ignored!
+        
+        Note 2: biases are adjusted to zero mean across succesor states
         """
         bias = _np.asarray(successorBias)
-        self.BiasMatrix = self._biasMask * bias 
-        
+        #balance the means between successor and predecessors:
+        offsets = self.BiasMeanWeights  * _np.sum(self.stateConnectivity * bias, axis=0)
+        self.BiasMatrix = self._biasMask * bias - offsets
+        print(self.BiasMatrix*1000)
         
     def updateTransitionTriggerInput(self, successorBias):
         """
@@ -458,9 +462,9 @@ class Kernel():
         """
         bias = _np.asarray(successorBias)
         if bias.ndim == 0:
-            self.updateB(bias * self._biasMask)
+            self.updateB(bias * self.stateConnectivity)
         if bias.ndim == 1:
-            self.updateB(bias[:, _np.newaxis] * self._biasMask)
+            self.updateB(bias[:, _np.newaxis] * self.stateConnectivity)
         elif bias.ndim == 2:
             self.updateB(bias)
         
