@@ -120,10 +120,11 @@ def _step(statevector,  #modified in-place
         return
         
 
-#values for the Kumaraswamy CDF that approximate the given incomplete beta function:
-_approximatedBetaInc = {
-    'beta1,1': (1.,1.),
-    'beta2,1': (2.,1.),
+_KumaraswamyCDFParameters = {
+    'kumaraswamy1,1': (1.,1.),
+    'kumaraswamy2,1': (2.,1.),
+    'kumaraswamy1,2': (1.,2.),
+    #values for the Kumaraswamy CDF that approximate the given incomplete beta function:
     'beta2,2': (1.913227338072261,2.2301669931409323),
     'beta3,3': (2.561444544688591,3.680069490606511),
     'beta2,5': (1.6666251656562021,5.9340642444701555),
@@ -186,8 +187,8 @@ class Kernel():
             nu=1.5,  
             beta=1.0, 
             dt=1e-2, 
-            nonlinearityLambda='beta25',
-            nonlinearityPsi='beta33',
+            nonlinearityLambda='kumaraswamy1,1',
+            nonlinearityPsi='kumaraswamy1,1',
             reuseNoiseSampleTimes = 10,
             reset=False, 
             recordSteps=-1):
@@ -217,8 +218,8 @@ class Kernel():
         else:
             self.successors = successors
         
-        self.nonlinearityParamsLambda = _approximatedBetaInc['beta2,5']   #nonlinearity for sparsifying activation values
-        self.nonlinearityParamsPsi  = _approximatedBetaInc['beta3,3']     #nonlinearity that linearizes phase variables 
+        self.nonlinearityParamsLambda = _KumaraswamyCDFParameters[nonlinearityLambda]   #nonlinearity for sparsifying activation values
+        self.nonlinearityParamsPsi  = _KumaraswamyCDFParameters[nonlinearityPsi]     #nonlinearity that linearizes phase variables 
 
         self.activationThreshold = 0.01          #clip very small activations below this value to avoid barely activated states
 
