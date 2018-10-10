@@ -94,16 +94,19 @@ def _step(statevector,  #modified in-place
         s[:,0] = statevector_normalized 
 
         #compute the transition/state activation matrix (Lambda)
-        phasesActivation[:,:] = 2 * _np.dot(s, s.T) / _np.sum(s**2) * stateConnectivity 
+        ssT = _np.dot(s, s.T)
+        scale = 8*_np.dot(s.T, s)[0,0] / _np.sum(_np.abs(s))**4
+        phasesActivation[:,:] = (ssT * scale * stateConnectivity)
         phasesActivation[:,:] = (phasesActivation - activationThreshold) / (1.0 - 2*activationThreshold) #makes sure that we numerically saturate and avoid very small, residual activations
-        _limit(phasesActivation)
+        #_limit(phasesActivation)
         #apply nonlinearity:
         phasesActivation[:,:] = 1.0-(1.0-phasesActivation**nonlinearityParamsLambda[0])**nonlinearityParamsLambda[1] #Kumaraswamy CDF
         
         #compute the state activation and put it into the diagonal of Lambda:
-        stateActivations = _np.diag(statevector_normalized**2) * (1.0-_np.sum(phasesActivation))
-        _limit(stateActivations)
-        phasesActivation[:,:] += stateActivations
+        residual =  (1.0-_np.sum(phasesActivation))
+        for i in range(numStates):
+            phasesActivation[i,i] = ssT[i,i] * residual
+        _limit(phasesActivation)
         
         #compute the phase progress matrix (Psi)
         newphases = 0.5 + 0.5 * (s-s.T)  #note: s and s.T get broadcasted to square shape
