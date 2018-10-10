@@ -47,7 +47,8 @@ def _step(statevector,  #modified in-place
           betaInv, 
           stateConnectivity, 
           activationThreshold, 
-          rho, 
+          rhoZero, 
+          rhoDelta,
           alpha, 
           dt, 
           dtInv, 
@@ -80,22 +81,22 @@ def _step(statevector,  #modified in-place
         biases = _np.dot(BiasMatrix, statevector)
 
         
+        statesigns = 1-2*(statevector<0)
         #This is the core computation and time integration of the dynamical system:
-        growth = alpha - _np.dot(rho, statevector)
-        velocity = statevector * growth * kd  + mu  #estimate velocity
+        growth = alpha - _np.dot(rhoZero, statesigns*statevector) + _np.maximum(statesigns*_np.dot(rhoDelta, statevector),0.0) 
+        velocity =  statevector * growth * kd + mu  #estimate velocity  #missing:
         dotstatevector[:] = velocity + noise_velocity + biases
-        statevector[:] = _np.maximum(statevector + dotstatevector*dt , 0) #set the new state and also ensure nonegativity
-
+        statevector[:] = (statevector + dotstatevector*dt)   #set the new state 
+        
+        
         #prepare a normalized state vector for the subsequent operations:
-        statevector_normalized = statevector*betaInv
-
         #create a proper 2D array of the state vector for numpy functions to work as we need it:
         s = _np.empty((numStates, 1))
-        s[:,0] = statevector_normalized 
+        s[:,0] = _np.abs(statevector*betaInv)
 
         #compute the transition/state activation matrix (Lambda)
         ssT = _np.dot(s, s.T)
-        scale = 8*_np.dot(s.T, s)[0,0] / _np.sum(_np.abs(s))**4
+        scale = 8*_np.dot(s.T, s)[0,0] / _np.sum(s)**4
         phasesActivation[:,:] = (ssT * scale * stateConnectivity)
         phasesActivation[:,:] = (phasesActivation - activationThreshold) / (1.0 - 2*activationThreshold) #makes sure that we numerically saturate and avoid very small, residual activations
         #_limit(phasesActivation)
@@ -107,7 +108,7 @@ def _step(statevector,  #modified in-place
         for i in range(numStates):
             phasesActivation[i,i] = ssT[i,i] * residual
         _limit(phasesActivation)
-        
+                
         #compute the phase progress matrix (Psi)
         newphases = 0.5 + 0.5 * (s-s.T)  #note: s and s.T get broadcasted to square shape
         _limit(newphases)
@@ -267,25 +268,30 @@ class Kernel():
         
         reimplements the computation by the SHCtoolbox code  
         """
-        rho = _np.zeros((self.numStates, self.numStates))
         stateConnectivity = _np.zeros((self.numStates, self.numStates))
-        #first, fill in the standard inhibitory values:
-        for state in range(self.numStates):
-            for successor in range(self.numStates):
-                if state == successor:
-                    rho[successor,state] = self.alpha[successor] * self.betaInv[successor] #override the special case i==j
-                else:
-                    rho[successor,state] = (self.alpha[successor] + self.alpha[state]) * self.betaInv[state]
-        #overwrite for the successor states:
         for state, successorsPerState in enumerate(self.successors):
             #precedecessorcount = len(predecessorsPerState)
             for successor in successorsPerState:
                 if state == successor: raise ValueError("Cannot set a state ({0}) as successor of itself!".format(state))
-                rho[successor,state] = (self.alpha[successor] - (self.alpha[state]/self.nu[state])) * self.betaInv[state]
                 stateConnectivity[successor,state] = 1 
-        self.rho = rho #save the final result
         self.stateConnectivity = stateConnectivity
-
+        
+        #first, fill in the standard values in rhoZero
+        # rhoZero = beta^-1 x alpha * (1 - I + alpha^-1 x alpha)
+        alphaInv = 1/self.alpha
+        s = _np.dot(self.alpha[:,_np.newaxis],self.betaInv[_np.newaxis,:])
+        rhoZero = s * (1-_np.eye(self.numStates)+_np.dot(self.alpha[:,_np.newaxis],alphaInv[_np.newaxis,:]))
+        
+        #then fill the rhoDelta that depends on the state connectivity:
+        rhoDelta = self.stateConnectivity * (self.alpha*self.betaInv*(1+1/self.nu))[:,_np.newaxis]
+        
+        self.rho =  rhoZero - rhoDelta #save the final result
+        self.rhoZero = rhoZero
+        self.rhoDelta = rhoDelta
+        print(self.rhoZero)
+        print(self.rhoDelta)
+        successorcount = _np.sum(stateConnectivity, axis=0)
+        self.BiasMeanWeights = _np.divide( stateConnectivity, successorcount, where=successorcount>1)
 
 
 
@@ -335,7 +341,8 @@ class Kernel():
                         self.betaInv , 
                         self.stateConnectivity, 
                         self.activationThreshold, 
-                        self.rho, 
+                        self.rhoZero, 
+                        self.rhoDelta, 
                         self.alpha, 
                         self.dt,
                         self.dtInv, 
