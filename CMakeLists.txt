@@ -53,6 +53,7 @@ add_message_files(
   PhasesActivations.msg
   SpeedExponentials.msg
   StateVector.msg
+  StateMatrix.msg
 )
 
 ## Generate services in the 'srv' folder
