@@ -288,10 +288,9 @@ class Kernel():
         self.rho =  rhoZero - rhoDelta #save the final result
         self.rhoZero = rhoZero
         self.rhoDelta = rhoDelta
-        print(self.rhoZero)
-        print(self.rhoDelta)
-        successorcount = _np.sum(stateConnectivity, axis=0)
-        self.BiasMeanWeights = _np.divide( stateConnectivity, successorcount, where=successorcount>1)
+        stateConnectivity[:,-1] = 0
+        successorCountInv = 1.0/_np.maximum(_np.sum(stateConnectivity, axis=0)[_np.newaxis,:],1.0)
+        self.BiasMeanBalancingWeights = stateConnectivity * successorCountInv
 
 
 
@@ -443,13 +442,13 @@ class Kernel():
        
         Note: states cannot be their own successors, so these values ignored!
         
-        Note 2: biases are adjusted to zero mean across succesor states
+        Note 2: predecessor bias is set from the mean bias across succesor states
         """
         bias = _np.asarray(successorBias)
         #balance the means between successor and predecessors:
-        offsets = self.BiasMeanWeights  * _np.sum(self.stateConnectivity * bias, axis=0)
-        self.BiasMatrix = self._biasMask * bias - offsets
-        print(self.BiasMatrix*1000)
+#        offsets = self.BiasMeanBalancingWeights  * _np.sum( (self.stateConnectivity+_np.eye(self.numStates)) * bias, axis=0)
+        offsets = _np.sum( self.BiasMeanBalancingWeights * bias, axis=0)
+        self.BiasMatrix = self._biasMask * bias + _np.diag(offsets)
         
     def updateTransitionTriggerInput(self, successorBias):
         """
