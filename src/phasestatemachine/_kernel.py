@@ -288,7 +288,6 @@ class Kernel():
         self.rho =  rhoZero - rhoDelta #save the final result
         self.rhoZero = rhoZero
         self.rhoDelta = rhoDelta
-        stateConnectivity[:,-1] = 0
         successorCountInv = 1.0/_np.maximum(_np.sum(stateConnectivity, axis=0)[_np.newaxis,:],1.0)
         self.BiasMeanBalancingWeights = stateConnectivity * successorCountInv
 
