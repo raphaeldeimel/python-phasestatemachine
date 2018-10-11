@@ -83,7 +83,7 @@ def _step(statevector,  #modified in-place
         
         statesigns = 1-2*(statevector<0)
         #This is the core computation and time integration of the dynamical system:
-        growth = alpha - _np.dot(rhoZero, statesigns*statevector) + _np.maximum(statesigns*_np.dot(rhoDelta, statevector),0.0) 
+        growth = alpha - _np.dot(rhoZero, statevector**2) + _np.maximum(statesigns*_np.dot(rhoDelta, statesigns*statevector**2),0.0) 
         velocity =  statevector * growth * kd + mu  #estimate velocity  #missing:
         dotstatevector[:] = velocity + noise_velocity + biases
         statevector[:] = (statevector + dotstatevector*dt)   #set the new state 
