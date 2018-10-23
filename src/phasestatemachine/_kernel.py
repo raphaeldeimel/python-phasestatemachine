@@ -31,6 +31,17 @@ def _limit(a):
 
 
 @jit(nopython=True)
+def _signfunc(x):
+     return 1-2*(x<0)
+
+# Alternaitve, differentiable "sign" function:
+#
+#@jit(nopython=True)
+#def _signfunc(x, epsilon=1e-4):
+#     return _np.tanh(x/epsilon)
+
+
+@jit(nopython=True)
 def _step(statevector,  #modified in-place
           dotstatevector, #modified in-place 
           phasesActivation, #modified in-place 
@@ -80,10 +91,18 @@ def _step(statevector,  #modified in-place
         #compute which transition biases should be applied right now:
         biases = _np.dot(BiasMatrix, statevector)
 
+        #s_abs = _np.abs(statevector)**1  #straight channels: |x|  (original SHC)
+        #s_abs = _np.abs(statevector)**2  #spherical channels: |x|**2
+        s_abs = statevector**2
         
-        statesigns = 1-2*(statevector<0)
+        #compute the growth rate adjustment depending on the signs of the state and rho:
+        #original SHC behavior: alpha_delta=_np.dot(rhoDelta, statesigns*s_abs)
+        statesigns = _signfunc(statevector)
+        alpha_delta_2 = 0.5*statesigns*_np.dot(rhoDelta, statesigns*s_abs)
+        alpha_delta = alpha_delta_2+alpha_delta_2*_signfunc(alpha_delta_2) #limits alpha_delta to positive values
+
         #This is the core computation and time integration of the dynamical system:
-        growth = alpha - _np.dot(rhoZero, statevector**2) + _np.maximum(statesigns*_np.dot(rhoDelta, statesigns*statevector**2),0.0) 
+        growth = alpha - _np.dot(rhoZero, s_abs) + alpha_delta
         velocity =  statevector * growth * kd + mu  #estimate velocity  #missing:
         dotstatevector[:] = velocity + noise_velocity + biases
         statevector[:] = (statevector + dotstatevector*dt)   #set the new state 
