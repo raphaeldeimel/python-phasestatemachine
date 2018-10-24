@@ -65,6 +65,7 @@ def _step(statevector,  #modified in-place
           dtInv, 
           nonlinearityParamsLambda,
           nonlinearityParamsPsi,
+          stateVectorExponent,
           ):
         """
         Core phase-state machine computation.
@@ -91,13 +92,14 @@ def _step(statevector,  #modified in-place
         #compute which transition biases should be applied right now:
         biases = _np.dot(BiasMatrix, statevector)
 
-        #s_abs = _np.abs(statevector)**1  #straight channels: |x|  (original SHC)
-        #s_abs = _np.abs(statevector)**2  #spherical channels: |x|**2
-        s_abs = statevector**2
+        statesigns = _signfunc(statevector)
+
+        #stateVectorExponent=1  #straight channels: |x|  (original SHC)
+        #stateVectorExponent=2  #spherical channels: |x|**2
+        s_abs = (statevector*statesigns)**stateVectorExponent
         
         #compute the growth rate adjustment depending on the signs of the state and rho:
         #original SHC behavior: alpha_delta=_np.dot(rhoDelta, statesigns*s_abs)
-        statesigns = _signfunc(statevector)
         alpha_delta_2 = 0.5*statesigns*_np.dot(rhoDelta, statesigns*s_abs)
         alpha_delta = alpha_delta_2+alpha_delta_2*_signfunc(alpha_delta_2) #limits alpha_delta to positive values
 
@@ -129,7 +131,10 @@ def _step(statevector,  #modified in-place
         _limit(phasesActivation)
                 
         #compute the phase progress matrix (Psi)
-        newphases = 0.5 + 0.5 * (s-s.T)  #note: s and s.T get broadcasted to square shape
+        epsilon = 0.0001
+        s_abs_m = _np.empty((numStates, 1))
+        s_abs_m[:,0] = s_abs**(1.0/stateVectorExponent)
+        newphases = ( (s_abs_m+epsilon)/(s_abs_m+s_abs_m.T+2*epsilon))
         _limit(newphases)
         #apply nonlinearity:
         newphases = 1.0-(1.0-newphases**nonlinearityParamsPsi[0])**nonlinearityParamsPsi[1] #Kumaraswamy CDF
@@ -207,6 +212,7 @@ class Kernel():
             nu=1.5,  
             beta=1.0, 
             dt=1e-2, 
+            stateVectorExponent=2.0,
             nonlinearityLambda='kumaraswamy1,1',
             nonlinearityPsi='kumaraswamy1,1',
             reuseNoiseSampleTimes = 10,
@@ -232,7 +238,7 @@ class Kernel():
         self.epsilon = self._sanitizeParam(epsilon) * self.beta #Wiener process noise
         self.reuseNoiseSampleTimes = reuseNoiseSampleTimes
         self.updateDt(dt)
-
+        self.stateVectorExponent =stateVectorExponent
         if predecessors is not None:  #convert list of predecessors into list of successors
             self.successors = self._predecessorListToSuccessorList(predecessors)
         else:
@@ -365,6 +371,7 @@ class Kernel():
                         self.dtInv, 
                         self.nonlinearityParamsLambda,
                         self.nonlinearityParamsPsi,
+                        self.stateVectorExponent,
                 )
 
             #note the currently most active state/transition (for informative purposes)
