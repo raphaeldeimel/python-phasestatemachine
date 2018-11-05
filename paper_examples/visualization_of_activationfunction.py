@@ -26,10 +26,20 @@ isolinevalues = linspace(0.1,1.1, 10)
 
 
 def f_proposed1(x0,x1):
+    """
+    
+    proposed function: 
+    
+        Matrix X:
+        X = x^nx1 . 1^1xn
+        
+        lambda = X @ X.T * 8 * (X*X + (X*X).T) / (X + X.T + 0.01)**4
+    
+    """
     xxt = x1 * x0
     L2_squared = x1**2 + x0**2 #xtx
     L1 = abs(x1)+abs(x0)
-    return 8 * xxt * L2_squared/ (L1**4 + 0.01)
+    return 8 * xxt * L2_squared / ((L1)**4 + 0.01)
 
 def f_proposed2(x0,x1):
     return 1-(1-f_proposed1(x0,x1)**2)**2 #kumaraswamy(1,2)
