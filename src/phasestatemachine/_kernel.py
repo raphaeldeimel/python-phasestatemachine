@@ -57,7 +57,6 @@ def _step(statevector,  #modified in-place
           numStates, 
           betaInv, 
           stateConnectivity, 
-          activationThreshold, 
           rhoZero, 
           rhoDelta,
           alpha, 
@@ -118,17 +117,15 @@ def _step(statevector,  #modified in-place
         #compute the transition/state activation matrix (Lambda)
         ssT = _np.dot(s, s.T)
         s2 = 8*s**2
-        phasesActivation[:,:] = (ssT * (s2 + s2.T) / ((s + s.T)**4 + 0.01) * stateConnectivity) #function shown in visualization_of_activationfunction.py
-        phasesActivation[:,:] = (phasesActivation - activationThreshold) / (1.0 - 2*activationThreshold) #makes sure that we numerically saturate and avoid very small, residual activations
-        #_limit(phasesActivation)
+        phasesActivation[:,:] =  ssT * (s2 + s2.T) / ((s + s.T)**4 + 0.01) * stateConnectivity #function shown in visualization_of_activationfunction.py
+        _limit(phasesActivation)
         #apply nonlinearity:
         phasesActivation[:,:] = 1.0-(1.0-phasesActivation**nonlinearityParamsLambda[0])**nonlinearityParamsLambda[1] #Kumaraswamy CDF
         
         #compute the state activation and put it into the diagonal of Lambda:
-        residual =  (1.0-_np.sum(phasesActivation))
+        residual = max(0,1-_np.sum(phasesActivation))
         for i in range(numStates):
-            phasesActivation[i,i] = ssT[i,i] * residual
-        _limit(phasesActivation)
+            phasesActivation[i,i] = s[i,0]**4 * residual
                 
         #compute the phase progress matrix (Psi)
         epsilon = 0.0001
@@ -247,7 +244,6 @@ class Kernel():
         self.nonlinearityParamsLambda = _KumaraswamyCDFParameters[nonlinearityLambda]   #nonlinearity for sparsifying activation values
         self.nonlinearityParamsPsi  = _KumaraswamyCDFParameters[nonlinearityPsi]     #nonlinearity that linearizes phase variables 
 
-        self.activationThreshold = 0.01          #clip very small activations below this value to avoid barely activated states
 
         #inputs:
         self.BiasMatrix = _np.zeros((self.numStates,self.numStates)) #determines transition preferences and state timeout duration
@@ -363,7 +359,6 @@ class Kernel():
                         self.numStates, 
                         self.betaInv , 
                         self.stateConnectivity, 
-                        self.activationThreshold, 
                         self.rhoZero, 
                         self.rhoDelta, 
                         self.alpha, 
