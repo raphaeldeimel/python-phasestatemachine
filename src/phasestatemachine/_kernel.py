@@ -91,7 +91,7 @@ def _step(statevector,  #modified in-place
 
 
         biases = _np.dot(BiasMatrix, statevector)
-        velocity_offset = biases + noise_velocity
+        velocity_offset = biases * dt + noise_velocity
         
         #compute which transition biases should be applied right now:
         if emulateHybridAutomaton:
