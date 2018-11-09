@@ -231,6 +231,7 @@ class Kernel():
             numStates=3, 
             predecessors=None, 
             successors=[[1],[2],[0]], 
+            alphaTime=None, 
             alpha=40.0, 
             epsilon=1e-9,
             nu=1.5,  
@@ -256,18 +257,23 @@ class Kernel():
         oldcount = self.numStates
         #parameters:
         self.numStates = numStates
-        self.alpha = self._sanitizeParam(alpha)
+        if alphaTime is None:  #backwards compatibility: if no alphatime is provided, use dt-dependent alpha value
+            self.alphaTime = self._sanitizeParam(alpha)/dt
+        else:
+            self.alphaTime = self._sanitizeParam(alphaTime)
+            
         self.beta = self._sanitizeParam(beta)
         self.betaInv = 1.0/self.beta             #this is used often, so precompute once
         self.nu = self._sanitizeParam(nu)
         self.epsilon = self._sanitizeParam(epsilon) * self.beta #Wiener process noise
         self.reuseNoiseSampleTimes = reuseNoiseSampleTimes
-        self.updateDt(dt)
         self.stateVectorExponent =stateVectorExponent
         if predecessors is not None:  #convert list of predecessors into list of successors
             self.successors = self._predecessorListToSuccessorList(predecessors)
         else:
             self.successors = successors
+        
+        self.updateDt(dt) #also calls self._updateRho
         
         self.nonlinearityParamsLambda = _KumaraswamyCDFParameters[nonlinearityLambda]   #nonlinearity for sparsifying activation values
         self.nonlinearityParamsPsi  = _KumaraswamyCDFParameters[nonlinearityPsi]     #nonlinearity that linearizes phase variables 
@@ -282,7 +288,6 @@ class Kernel():
         self.velocityAdjustmentGain = _np.zeros((self.numStates,self.numStates))  #gain of the control enslaving the given state transition
         self.phaseVelocityExponentInput = _np.zeros((self.numStates,self.numStates))  #contains values that limit transition velocity
         
-        self._updateRho()
         #internal data structures
         if self.numStates != oldcount or reset: #force a reset if number of states change
             self.statevector = _np.zeros((numStates))
@@ -437,6 +442,8 @@ class Kernel():
         self.dt  = dt
         self.dtInv = 1.0 / dt
         self.epsilonPerSample = self.epsilon *_np.sqrt(self.dt*self.reuseNoiseSampleTimes)/dt  #factor accounts for the accumulation during a time step (assuming a Wiener process)
+        self.alpha = self.alphaTime * self.dt 
+        self._updateRho()
 
     def updateEpsilon(self, epsilon):
         """
