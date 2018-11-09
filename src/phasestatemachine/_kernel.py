@@ -65,6 +65,8 @@ def _step(statevector,  #modified in-place
           nonlinearityParamsLambda,
           nonlinearityParamsPsi,
           stateVectorExponent,
+          emulateHybridAutomaton,  #for HA emulation mode
+          triggervalue_successors, #for HA emulation mode, modified in-place
           ):
         """
         Core phase-state machine computation.
@@ -88,8 +90,33 @@ def _step(statevector,  #modified in-place
         mu = correctiveActionPredecessor - correctiveActionSuccessor
 
 
-        #compute which transition biases should be applied right now:
         biases = _np.dot(BiasMatrix, statevector)
+        velocity_offset = biases + noise_velocity
+        
+        #compute which transition biases should be applied right now:
+        if emulateHybridAutomaton:
+            predecessors = 1.0*(_np.abs(statevector)*betaInv > 0.99)
+            successors =  (_np.dot(stateConnectivity,  predecessors) > 0.5 )
+            notsuccessors =  (_np.dot(stateConnectivity,  predecessors) < 0.5 )
+            triggervalue_successors[notsuccessors] = 0.0
+            velocity_offset = _np.zeros((numStates))
+            threshold = 0.1
+            if _np.any(triggervalue_successors >= threshold ):
+                chosensuccessor = _np.argmax(triggervalue_successors)
+                value_chosen = triggervalue_successors[chosensuccessor]
+                notchosensuccessors = successors.copy()
+                notchosensuccessors[chosensuccessor] = 0
+
+                triggervalue_successors[:] = 0.0
+                triggervalue_successors[chosensuccessor] = value_chosen
+                
+                if triggervalue_successors[chosensuccessor] < 1e5:
+                    triggervalue_successors[ chosensuccessor ] = 1e6
+                    print( chosensuccessor)
+                    velocity_offset[chosensuccessor] = 1.0
+            else:
+                 triggervalue_successors[:] += biases * dt + noise_velocity
+
 
         statesigns = _signfunc(statevector)
 
@@ -105,7 +132,7 @@ def _step(statevector,  #modified in-place
         #This is the core computation and time integration of the dynamical system:
         growth = alpha - _np.dot(rhoZero, s_abs) + alpha_delta
         velocity =  statevector * growth * kd + mu  #estimate velocity  #missing:
-        dotstatevector[:] = velocity + noise_velocity + biases
+        dotstatevector[:] = velocity + velocity_offset
         statevector[:] = (statevector + dotstatevector*dt)   #set the new state 
         
         
@@ -214,7 +241,8 @@ class Kernel():
             nonlinearityPsi='kumaraswamy1,1',
             reuseNoiseSampleTimes = 10,
             reset=False, 
-            recordSteps=-1):
+            recordSteps=-1,
+            emulateHybridAutomaton=False):
         """
         Method to set or reconfigure the phase-state-machine
         
@@ -244,9 +272,11 @@ class Kernel():
         self.nonlinearityParamsLambda = _KumaraswamyCDFParameters[nonlinearityLambda]   #nonlinearity for sparsifying activation values
         self.nonlinearityParamsPsi  = _KumaraswamyCDFParameters[nonlinearityPsi]     #nonlinearity that linearizes phase variables 
 
-
         #inputs:
         self.BiasMatrix = _np.zeros((self.numStates,self.numStates)) #determines transition preferences and state timeout duration
+
+        self.emulateHybridAutomaton = emulateHybridAutomaton #set this to true to emulate discrete switching behavior on bias input
+        self.triggervalue_successors = _np.zeros((self.numStates))
         
         self.phasesInput = _np.zeros((self.numStates,self.numStates)) #input to synchronize state transitions (slower/faster)
         self.velocityAdjustmentGain = _np.zeros((self.numStates,self.numStates))  #gain of the control enslaving the given state transition
@@ -367,6 +397,8 @@ class Kernel():
                         self.nonlinearityParamsLambda,
                         self.nonlinearityParamsPsi,
                         self.stateVectorExponent,
+                        self.emulateHybridAutomaton,
+                        self.triggervalue_successors
                 )
 
             #note the currently most active state/transition (for informative purposes)
