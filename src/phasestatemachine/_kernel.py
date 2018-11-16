@@ -91,7 +91,8 @@ def _step(statevector,  #modified in-place
 
 
         biases = _np.dot(BiasMatrix, statevector)
-        velocity_offset = biases * dt + noise_velocity
+        velocity_offset = biases * dt 
+        noise_statevector = noise_velocity * dt
         
         #compute which transition biases should be applied right now:
         if emulateHybridAutomaton:
@@ -99,7 +100,7 @@ def _step(statevector,  #modified in-place
             successors =  (_np.dot(stateConnectivity,  predecessors) > 0.5 )
             notsuccessors =  (_np.dot(stateConnectivity,  predecessors) < 0.5 )
             triggervalue_successors[notsuccessors] = 0.0
-            velocity_offset = _np.zeros((numStates))
+            noise_statevector = _np.zeros((numStates))
             threshold = 0.1
             if _np.any(triggervalue_successors >= threshold ):
                 chosensuccessor = _np.argmax(triggervalue_successors)
@@ -113,7 +114,7 @@ def _step(statevector,  #modified in-place
                 if triggervalue_successors[chosensuccessor] < 1e5:
                     triggervalue_successors[ chosensuccessor ] = 1e6
                     print( chosensuccessor)
-                    velocity_offset[chosensuccessor] = 1.0
+                    noise_statevector[chosensuccessor] = 1.0
             else:
                  triggervalue_successors[:] += biases * dt + noise_velocity
 
@@ -132,8 +133,8 @@ def _step(statevector,  #modified in-place
         #This is the core computation and time integration of the dynamical system:
         growth = alpha - _np.dot(rhoZero, s_abs) + alpha_delta
         velocity =  statevector * growth * kd + mu  #estimate velocity  #missing:
-        dotstatevector[:] = velocity + velocity_offset
-        statevector[:] = (statevector + dotstatevector*dt)   #set the new state 
+        dotstatevector[:] = velocity + velocity_offset #do not add noise to velocity, promp mixer doesnt like it
+        statevector[:] = (statevector + dotstatevector*dt + noise_statevector)   #set the new state 
         
         
         #prepare a normalized state vector for the subsequent operations:
