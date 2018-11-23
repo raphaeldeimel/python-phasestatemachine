@@ -65,6 +65,7 @@ def _step(statevector,  #modified in-place
           nonlinearityParamsLambda,
           nonlinearityParamsPsi,
           stateVectorExponent,
+          epsilonLambda,
           emulateHybridAutomaton,  #for HA emulation mode
           triggervalue_successors, #for HA emulation mode, modified in-place
           ):
@@ -144,25 +145,28 @@ def _step(statevector,  #modified in-place
 
         #compute the transition/state activation matrix (Lambda)
         ssT = _np.dot(s, s.T)
-        s2 = 8*s**2
-        phasesActivation[:,:] =  ssT * (s2 + s2.T) / ((s + s.T)**4 + 0.01) * stateConnectivity #function shown in visualization_of_activationfunction.py
+        s2 = s**2
+        activations = ssT * 8 * (s2 + s2.T) / ((s + s.T)**4  + epsilonLambda) 
+        phasesActivation[:,:] =  activations * stateConnectivity #function shown in visualization_of_activationfunction.py
         _limit(phasesActivation)
         #apply nonlinearity:
-        phasesActivation[:,:] = 1.0-(1.0-phasesActivation**nonlinearityParamsLambda[0])**nonlinearityParamsLambda[1] #Kumaraswamy CDF
+        if (nonlinearityParamsLambda[0] != 1.0 or nonlinearityParamsLambda[1] != 1.0 ):
+            phasesActivation[:,:] = 1.0-(1.0-phasesActivation**nonlinearityParamsLambda[0])**nonlinearityParamsLambda[1] #Kumaraswamy CDF
         
         #compute the state activation and put it into the diagonal of Lambda:
-        residual = max(0,1-_np.sum(phasesActivation))
+        residual = _np.prod(1-phasesActivation) 
+        stateactivation_normalized = s2/ _np.sum(s2) 
         for i in range(numStates):
-            phasesActivation[i,i] = s[i,0]**4 * residual
+            phasesActivation[i,i] =  stateactivation_normalized[i,0] * residual
                 
         #compute the phase progress matrix (Psi)
-        epsilon = 0.0001
-        s_abs_m = _np.empty((numStates, 1))
-        s_abs_m[:,0] = s_abs**(1.0/stateVectorExponent)
-        newphases = ( (s_abs_m+epsilon)/(s_abs_m+s_abs_m.T+2*epsilon))
+        epsilonPsi = 0.0001
+        s_epsilonPsi = s+epsilonPsi
+        newphases = s_epsilonPsi / (s_epsilonPsi+s_epsilonPsi.T)
         _limit(newphases)
         #apply nonlinearity:
-        newphases = 1.0-(1.0-newphases**nonlinearityParamsPsi[0])**nonlinearityParamsPsi[1] #Kumaraswamy CDF
+        if (nonlinearityParamsPsi[0] != 1.0 or nonlinearityParamsPsi[1] != 1.0 ):
+            newphases = 1.0-(1.0-newphases**nonlinearityParamsPsi[0])**nonlinearityParamsPsi[1] #Kumaraswamy CDF
         
         phasesProgressVelocities[:,:] = (newphases - phasesProgress) * dtInv
         phasesProgress[:,:] = newphases
@@ -267,6 +271,7 @@ class Kernel():
         self.betaInv = 1.0/self.beta             #this is used often, so precompute once
         self.nu = self._sanitizeParam(nu)
         self.epsilon = self._sanitizeParam(epsilon) * self.beta #Wiener process noise
+        self.epsilonLambda=0.01 #regularization parameter of activation function
         self.reuseNoiseSampleTimes = reuseNoiseSampleTimes
         self.stateVectorExponent =stateVectorExponent
         if predecessors is not None:  #convert list of predecessors into list of successors
@@ -403,6 +408,7 @@ class Kernel():
                         self.nonlinearityParamsLambda,
                         self.nonlinearityParamsPsi,
                         self.stateVectorExponent,
+                        self.epsilonLambda,
                         self.emulateHybridAutomaton,
                         self.triggervalue_successors
                 )
