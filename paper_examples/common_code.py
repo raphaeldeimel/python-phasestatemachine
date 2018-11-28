@@ -71,7 +71,7 @@ def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True, 
 
 
 
-def visualizeWithStreamlines(phasta, name, spread=0.05 ,n_streamlines = 50, streamline_length=100, coloration_strides=5):
+def visualizeWithStreamlines(phasta, name, spread=0.05 ,n_streamlines = 50, streamline_length=100, coloration_strides=5, azimut=30, elevation=60, limits = [0, 1.05]):
 
     n_stream_vertices = [streamline_length]*n_streamlines
 
@@ -88,7 +88,7 @@ def visualizeWithStreamlines(phasta, name, spread=0.05 ,n_streamlines = 50, stre
 
 
     ax = Axes3D(plt.figure())
-    ax.view_init(elev=60., azim=30)
+    ax.view_init(elev=elevation, azim=azimut)
     #ax.mouse_init(rotate_btn=1, zoom_btn=3)
     for i in range(n_streamlines):
         line = streamlines[i]
@@ -104,9 +104,9 @@ def visualizeWithStreamlines(phasta, name, spread=0.05 ,n_streamlines = 50, stre
             else:
                 c = (l1,l2,l2)
             ax.plot(seg[:,0],seg[:,1],seg[:,2], color=c, linewidth=1.0, alpha=0.5)
-    ax.set_xlim3d(-1,1.1)
-    ax.set_ylim3d(-1,1.1)
-    ax.set_zlim3d(-1,1.1)
+    ax.set_xlim3d(limits[0],limits[1])
+    ax.set_ylim3d(limits[0],limits[1])
+    ax.set_zlim3d(limits[0],limits[1])
     ax.set_zlabel('x2')
     ax.set_ylabel('x1')
     ax.set_xlabel('x0')
