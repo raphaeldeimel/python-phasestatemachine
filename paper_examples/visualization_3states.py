@@ -6,7 +6,7 @@
 @licence: 2-clause BSD licence
 
 
-Demonstration of bidirectional edges by using state-antistate graphs
+Illustration of three states forming a cyclic graph (minimal viable system for SHC without bidirectionality)
 
 """
 
