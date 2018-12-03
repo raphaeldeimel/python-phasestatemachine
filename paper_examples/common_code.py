@@ -71,18 +71,49 @@ def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True, 
 
 
 
-def visualizeWithStreamlines(phasta, name, spread=0.05 ,n_streamlines = 50, streamline_length=100, coloration_strides=5, azimut=30, elevation=60, limits = [0, 1.05]):
+def visualizeWithStreamlines(
+    phasta, 
+    name, 
+    spread=0.05,
+    n_streamlines = 50, 
+    streamline_length=100, 
+    coloration_strides=5, 
+    azimut=30, 
+    elevation=60, 
+    limits = [0, 1.05], 
+    dims=[0,1,2], 
+    streamlines_commonstartpoint=None, 
+    noise_seed = None,
+    bias_signal = None,
+    rho_deltas = None,
+    ):
 
     n_stream_vertices = [streamline_length]*n_streamlines
 
+    if _np.isscalar(coloration_strides):
+        stride_length = streamline_length  // coloration_strides
+        coloration_strides = _np.arange(0, coloration_strides+1) * stride_length
+        coloration_strides[-1]  = streamline_length
+    else:
+        coloration_strides = _np.asarray(coloration_strides)
+    if noise_seed is None:
+        noise_seed = (_np.random.uniform(size=(phasta.numStates, n_streamlines))*2*spread-spread)
+    
 
     streamlines = []
     for i in range(n_streamlines):
         streamline = _np.zeros((n_stream_vertices[i],3))
-        streamline_nextstart = phasta.statevector + (_np.random.uniform(size=3)*2*spread-spread)
-        phasta.statevector[:] = streamline_nextstart
+        if streamlines_commonstartpoint is None:
+            streamline_nextstart = phasta.statevector 
+        else:
+            streamline_nextstart = streamlines_commonstartpoint
+        phasta.statevector[:] = streamline_nextstart #+ noise_seed[:,i]
+        phasta.updateTransitionTriggerInput(noise_seed[:,i])
+        phasta.step()
         for l in range(n_stream_vertices[i]):
-            streamline[l,:] = phasta.statevector
+            streamline[l,:] = phasta.statevector[dims]
+            if rho_deltas is not None:
+                phasta.rhoDelta[:,:] = rho_deltas[l]
             phasta.step()
         streamlines.append(streamline)
 
@@ -93,12 +124,13 @@ def visualizeWithStreamlines(phasta, name, spread=0.05 ,n_streamlines = 50, stre
     for i in range(n_streamlines):
         line = streamlines[i]
         length = n_stream_vertices[i]
-        colscale=1.0/length
-        stride= max(3, length  // coloration_strides)
-        for i_segment in range(0,length,stride):
-            seg =  line[i_segment:i_segment+stride+1,:]
-            l1 = 0.3+0.7*(i_segment*colscale)
-            l2 = 0.2+0.2*(i_segment*colscale)
+        for i  in range(len(coloration_strides)-1):
+            i_start = coloration_strides[i]
+            i_end = coloration_strides[i+1]
+            colval =   float(i) / (coloration_strides.size-1)
+            seg =  line[i_start:i_end+1,:]
+            l1 = _np.clip( 0.1+0.89 * colval, 0.0, 1.0)
+            l2 = _np.clip( 0.1+0.5 * colval, 0.0, 1.0)
             if sum(seg[0,:]) < 0:
                 c = (l2,l2,l1)
             else:
@@ -113,3 +145,12 @@ def visualizeWithStreamlines(phasta, name, spread=0.05 ,n_streamlines = 50, stre
     plt.savefig('figures/{0}.pdf'.format(name), bbox_inches='tight')
     plt.savefig('figures/{0}.jpg'.format(name), bbox_inches='tight')
 
+
+
+def isInteractive():
+    try:
+        if sys.ps1: interpreter = True
+    except AttributeError:
+        interpreter = False
+        if sys.flags.interactive: interpreter = True
+    return interpreter
