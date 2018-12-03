@@ -112,7 +112,7 @@ visualizeWithStreamlines(phasta, "rho_modified_decisive",
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoint,
     noise_seed=noise_seed,
-    rho_deltas=getRhoDeltasSimple(streamline_length, 2.0), #hyperdecisive, not always stable anymore
+    rho_deltas=getRhoDeltasSimple(streamline_length, 4.0), #hyperdecisive, not always stable anymore
 )
 
 print(phasta.rhoDelta)
@@ -123,9 +123,11 @@ print(phasta.rhoZero)
 n_split = 70
 
 
-rho_deltas = getRhoDeltasSimple(n_split, 0.0) + getRhoDeltasSimple(streamline_length-n_split, 0.5, 0.5) 
 
-visualizeWithStreamlines(phasta, "rho_modified_reconsideration_moderate", 
+
+rho_deltas = getRhoDeltasSimple(n_split, 0.0) + getRhoDeltasSimple(streamline_length-n_split, 0.0, 0.5) 
+
+visualizeWithStreamlines(phasta, "rho_modified_reconsideration_moderatelysure", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -136,9 +138,12 @@ visualizeWithStreamlines(phasta, "rho_modified_reconsideration_moderate",
     rho_deltas=rho_deltas,
 )
 
-rho_deltas = getRhoDeltasSimple(n_split, 0.0) + getRhoDeltasSimple(streamline_length-n_split, 1.0, 1.0) 
 
-visualizeWithStreamlines(phasta, "rho_modified_reconsideration", 
+
+
+rho_deltas = getRhoDeltasSimple(n_split, 0.0) + getRhoDeltasSimple(streamline_length-n_split, 0.0, 1.5) 
+
+visualizeWithStreamlines(phasta, "rho_modified_reconsideration_sure", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -149,9 +154,9 @@ visualizeWithStreamlines(phasta, "rho_modified_reconsideration",
     rho_deltas=rho_deltas,
 )
 
-rho_deltas = getRhoDeltasSimple(n_split, 0.0) + getRhoDeltasSimple(streamline_length-n_split, 4.0, 4.0) 
 
 
+rho_deltas = getRhoDeltasSimple(n_split, 0.0) + getRhoDeltasSimple(streamline_length-n_split, 4.0, 6.0) 
 
 visualizeWithStreamlines(phasta, "rho_modified_latehyperdecisiveness", 
     spread=spread, 
