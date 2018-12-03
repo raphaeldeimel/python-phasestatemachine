@@ -32,21 +32,21 @@ def _limit(a):
 
 @jit(nopython=True)
 def _signfunc(x):
-     return 1-2*(x<0)
+     return 1.0-2*(x<0)
 
-# Alternaitve, differentiable "sign" function:
-#
+# Alternative, differentiable "sign" function
+# Also improves stability of the state's sign
 #@jit(nopython=True)
-#def _signfunc(x, epsilon=1e-4):
+#def _signfunc(x, epsilon=1e-3):
 #     return _np.tanh(x/epsilon)
 
 
 @jit(nopython=True)
 def _step(statevector,  #modified in-place
           dotstatevector, #modified in-place 
-          phasesActivation, #modified in-place 
-          phasesProgress,  #modified in-place
-          phasesProgressVelocities, #modified in-place 
+          activationMatrix, #modified in-place 
+          phasesMatrix,  #modified in-place
+          phaseVelocitiesMatrix, #modified in-place 
           #inputs:
           phaseVelocityExponentInput, 
           BiasMatrix, 
@@ -77,10 +77,10 @@ def _step(statevector,  #modified in-place
         the function modifies several arguments (numpy arrays) in place.
         """
         #compute adjustment to the instantaneously effective growth factor
-        kd = 2**_np.sum(phasesActivation * phaseVelocityExponentInput) 
+        kd = 2**_np.sum(activationMatrix * phaseVelocityExponentInput) 
         
         #compute mu for phase control:
-        phaseerrors = phasesActivation * (phasesInput-phasesProgress)
+        phaseerrors = activationMatrix * (phasesInput-phasesMatrix)
         correctiveAction = phaseerrors * velocityAdjustmentGain
         correctiveActionPredecessor = _np.zeros((numStates))
         for i in range(numStates):
@@ -121,55 +121,54 @@ def _step(statevector,  #modified in-place
 
 
         statesigns = _signfunc(statevector)
+        statesignsOuterProduct = _np.outer(statesigns,statesigns)
 
         #stateVectorExponent=1  #straight channels: |x|  (original SHC)
         #stateVectorExponent=2  #spherical channels: |x|**2
-        s_abs = (statevector*statesigns)**stateVectorExponent
+        x_abs = (statevector*statesigns)**stateVectorExponent
         
         #compute the growth rate adjustment depending on the signs of the state and rho:
-        #original SHC behavior: alpha_delta=_np.dot(rhoDelta, statesigns*s_abs)
-        alpha_delta_2 = 0.5*statesigns*_np.dot(rhoDelta, statesigns*s_abs)
-        alpha_delta = alpha_delta_2+alpha_delta_2*_signfunc(alpha_delta_2) #limits alpha_delta to positive values
+        #original SHC behavior: alpha_delta=_np.dot(rhoDelta, statesigns*x)
+        rhodelta_mask = 1.0 * ( stateConnectivity * statesignsOuterProduct > -0.5) #set rhodelta to zero if state sign flips without us wanting it to
+        alpha_delta = _np.dot(rhoDelta*rhodelta_mask, x_abs)
 
         #This is the core computation and time integration of the dynamical system:
-        growth = alpha - _np.dot(rhoZero, s_abs) + alpha_delta
+        growth = alpha - _np.dot(rhoZero, x_abs) + alpha_delta
         velocity =  statevector * growth * kd + mu  #estimate velocity  #missing:
         dotstatevector[:] = velocity + velocity_offset #do not add noise to velocity, promp mixer doesnt like it
         statevector[:] = (statevector + dotstatevector*dt + noise_statevector)   #set the new state 
         
-        
         #prepare a normalized state vector for the subsequent operations:
-        #create a proper 2D array of the state vector for numpy functions to work as we need it:
-        s = _np.empty((numStates, 1))
-        s[:,0] = _np.abs(statevector*betaInv)
-
+        statevector_scaled = statevector*betaInv
+        SP = _np.outer(statevector, statevector)
+        P = statevector.reshape((1,numStates))
+        P2 = P*P
+        S = P.T
+        S2 = P2.T
         #compute the transition/state activation matrix (Lambda)
-        ssT = _np.dot(s, s.T)
-        s2 = s**2
-        activations = ssT * 8 * (s2 + s2.T) / ((s + s.T)**4  + epsilonLambda) 
-        phasesActivation[:,:] =  activations * stateConnectivity #function shown in visualization_of_activationfunction.py
-        _limit(phasesActivation)
+        activations = SP * 8 * (P2 + S2) / ((P + S)**4  + epsilonLambda) 
+        activationMatrix[:,:] =  activations * stateConnectivity #function shown in visualization_of_activationfunction.py
+        _limit(activationMatrix)
         #apply nonlinearity:
         if (nonlinearityParamsLambda[0] != 1.0 or nonlinearityParamsLambda[1] != 1.0 ):
-            phasesActivation[:,:] = 1.0-(1.0-phasesActivation**nonlinearityParamsLambda[0])**nonlinearityParamsLambda[1] #Kumaraswamy CDF
+            activationMatrix[:,:] = 1.0-(1.0-activationMatrix**nonlinearityParamsLambda[0])**nonlinearityParamsLambda[1] #Kumaraswamy CDF
         
         #compute the state activation and put it into the diagonal of Lambda:
-        residual = _np.prod(1-phasesActivation) 
-        stateactivation_normalized = s2/ _np.sum(s2) 
+        residual = _np.prod(1-activationMatrix) 
+        stateactivation_normalized = S2/ _np.sum(S2) 
         for i in range(numStates):
-            phasesActivation[i,i] =  stateactivation_normalized[i,0] * residual
+            activationMatrix[i,i] =  stateactivation_normalized[i,0] * residual
                 
         #compute the phase progress matrix (Psi)
         epsilonPsi = 0.0001
-        s_epsilonPsi = s+epsilonPsi
-        newphases = s_epsilonPsi / (s_epsilonPsi+s_epsilonPsi.T)
+        newphases = (S+epsilonPsi) / (S+P+2*epsilonPsi)
         _limit(newphases)
         #apply nonlinearity:
         if (nonlinearityParamsPsi[0] != 1.0 or nonlinearityParamsPsi[1] != 1.0 ):
             newphases = 1.0-(1.0-newphases**nonlinearityParamsPsi[0])**nonlinearityParamsPsi[1] #Kumaraswamy CDF
         
-        phasesProgressVelocities[:,:] = (newphases - phasesProgress) * dtInv
-        phasesProgress[:,:] = newphases
+        phaseVelocitiesMatrix[:,:] = (newphases - phasesMatrix) * dtInv
+        phasesMatrix[:,:] = newphases
 
         return
         
@@ -514,7 +513,7 @@ class Kernel():
         #balance the means between successor and predecessors:
 #        offsets = self.BiasMeanBalancingWeights  * _np.sum( (self.stateConnectivity+_np.eye(self.numStates)) * bias, axis=0)
         offsets = _np.sum( self.BiasMeanBalancingWeights * bias, axis=0)
-        self.BiasMatrix = self._biasMask * bias + _np.diag(offsets)
+        self.BiasMatrix = self._biasMask * bias #+ _np.diag(offsets)
         
     def updateTransitionTriggerInput(self, successorBias):
         """

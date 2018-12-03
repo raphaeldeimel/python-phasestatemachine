@@ -30,21 +30,23 @@ predecessors = [
   [1]
 ]
 phasta = phasestatemachine.Kernel(
-    alpha = 10.0,
-    nu=1.5,
+    alpha = 20.0,
+    nu=1.0,
     numStates = 3,
     dt=0.01,
     epsilon=1e-3,
     predecessors = predecessors,
     recordSteps = 10000,
 )
-#phasta.rhoDelta[1,0] = -phasta.rhoDelta[1,0]
-phasta.rhoDelta[0,1] =  -phasta.rhoDelta[1,0]
-#phasta.rhoDelta[2,1] = 0
 
+phasta.rhoDelta[0,1] =  phasta.rhoDelta[1,0]
+phasta.stateConnectivity[0,1] =  -1
 
-visualizeWithStreamlines(phasta, "vectorfield_SHC", limits=(-1.05, 1.05))
+print(phasta.rhoDelta)
+print(phasta.stateConnectivity)
 
-if sys.flags.interactive:
+visualizeWithStreamlines(phasta, "bidirectional_edges", limits=(-1.05, 1.05))
+
+if isInteractive():
     ion()
     show()
