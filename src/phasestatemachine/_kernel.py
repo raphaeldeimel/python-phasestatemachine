@@ -133,7 +133,7 @@ def _step(statevector,  #modified in-place
         alpha_delta = _np.dot(rhoDelta*rhodelta_mask, x_abs)
 
         #This is the core computation and time integration of the dynamical system:
-        growth = alpha - _np.dot(rhoZero, x_abs) + alpha_delta
+        growth = alpha + _np.dot(rhoZero, x_abs) + alpha_delta
         velocity =  statevector * growth * kd + mu  #estimate velocity  #missing:
         dotstatevector[:] = velocity + velocity_offset #do not add noise to velocity, promp mixer doesnt like it
         statevector[:] = (statevector + dotstatevector*dt + noise_statevector)   #set the new state 
@@ -341,12 +341,12 @@ class Kernel():
         # rhoZero = beta^-1 x alpha * (1 - I + alpha^-1 x alpha)
         alphaInv = 1/self.alpha
         s = _np.dot(self.alpha[:,_np.newaxis],self.betaInv[_np.newaxis,:])
-        rhoZero = s * (1-_np.eye(self.numStates)+_np.dot(self.alpha[:,_np.newaxis],alphaInv[_np.newaxis,:]))
+        rhoZero = s * (_np.eye(self.numStates) - 1 - _np.dot(self.alpha[:,_np.newaxis],alphaInv[_np.newaxis,:]))
         
         #then fill the rhoDelta that depends on the state connectivity:
         rhoDelta = self.stateConnectivity * (self.alpha*self.betaInv*(1+1/self.nu))[:,_np.newaxis]
         
-        self.rho =  rhoZero - rhoDelta #save the final result
+        self.rho =  - rhoZero - rhoDelta #save the final result
         self.rhoZero = rhoZero
         self.rhoDelta = rhoDelta
         successorCountInv = 1.0/_np.maximum(_np.sum(stateConnectivity, axis=0)[_np.newaxis,:],1.0)
