@@ -128,8 +128,8 @@ def _step(statevector,  #modified in-place
         x_abs = (statevector*statesigns)**stateVectorExponent
         
         #compute the growth rate adjustment depending on the signs of the state and rho:
-        #original SHC behavior: alpha_delta=_np.dot(rhoDelta, statesigns*x)
-        rhodelta_mask = 1.0 * ( stateConnectivity * statesignsOuterProduct > -0.5) #set rhodelta to zero if state sign flips without us wanting it to
+        #original SHC behavior: alpha_delta=_np.dot(stateConnectivity*rhoDelta, statesigns*x)
+        rhodelta_mask = 1.0 * ( stateConnectivity * statesignsOuterProduct > 0.5) #set rhodelta to zero if state sign flips without us wanting it to
         alpha_delta = _np.dot(rhoDelta*rhodelta_mask, x_abs)
 
         #This is the core computation and time integration of the dynamical system:
