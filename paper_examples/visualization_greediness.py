@@ -45,7 +45,7 @@ phasta = phasestatemachine.Kernel(
     nu=1.0,
     numStates = 4,
     dt=0.01,
-    epsilon=1e-5,
+    epsilon=0e-5,
     successors = successors,
     recordSteps = 10000,
 )
@@ -65,7 +65,7 @@ decision_signal1 = _np.zeros((streamline_length))
 decision_signal2 = _np.zeros((streamline_length))
 
 
-def getRhoDeltasSimple(n, decisiveness=0.0, reconsideration=0.0, alpha = 20):
+def getListOfPreferenceVectors(n, decisiveness=0.0, reconsideration=0.0, alpha = 20):
     rhoDeltaInput = phasta.rhoDelta.copy()
     rhoDeltaInput[1,2] = -alpha * (decisiveness+reconsideration)
     rhoDeltaInput[2,1] = -alpha * (decisiveness-reconsideration)
@@ -75,8 +75,9 @@ def getRhoDeltasSimple(n, decisiveness=0.0, reconsideration=0.0, alpha = 20):
     return rhoDeltas
 
 
+preferences = [ 1.0 ] * streamline_length
 
-visualizeWithStreamlines(phasta, "rho_modified_original", 
+visualizeWithStreamlines(phasta, "stategreediness_original", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -84,13 +85,14 @@ visualizeWithStreamlines(phasta, "rho_modified_original",
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoint,
     noise_seed=noise_seed,
-    rho_deltas=getRhoDeltasSimple(streamline_length, 0.0), #behavior of the unmodified SHC
+    preferences=preferences,
 )
 
 
 
+preferences = [ 0.0 ] * streamline_length #maximum indecision
 
-visualizeWithStreamlines(phasta, "rho_modified_indecisive", 
+visualizeWithStreamlines(phasta, "stategreediness_indecisive", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -98,13 +100,14 @@ visualizeWithStreamlines(phasta, "rho_modified_indecisive",
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoint,
     noise_seed=noise_seed,
-    rho_deltas=getRhoDeltasSimple(streamline_length, -0.5), #maximum indecision
+    preferences=preferences,
 )
 
 
+preferences = [ 8.0 ] * streamline_length #hyperdecisive
 
 
-visualizeWithStreamlines(phasta, "rho_modified_decisive", 
+visualizeWithStreamlines(phasta, "stategreediness_decisive", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -112,7 +115,7 @@ visualizeWithStreamlines(phasta, "rho_modified_decisive",
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoint,
     noise_seed=noise_seed,
-    rho_deltas=getRhoDeltasSimple(streamline_length, 4.0), #hyperdecisive, not always stable anymore
+    preferences=preferences,
 )
 
 print(phasta.rhoDelta)
@@ -121,13 +124,11 @@ print(phasta.rhoZero)
 
 
 n_split = 70
+n_split2 = streamline_length-n_split
 
+preferences = [ 0 ] * n_split + [ array([0,1.0,4.0,0]) ] * n_split2
 
-
-
-rho_deltas = getRhoDeltasSimple(n_split, 0.0) + getRhoDeltasSimple(streamline_length-n_split, 0.0, 0.5) 
-
-visualizeWithStreamlines(phasta, "rho_modified_reconsideration_moderatelysure", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_moderatelysure", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -135,15 +136,15 @@ visualizeWithStreamlines(phasta, "rho_modified_reconsideration_moderatelysure",
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoint,
     noise_seed=noise_seed,
-    rho_deltas=rho_deltas,
+    preferences=preferences,
 )
 
 
 
 
-rho_deltas = getRhoDeltasSimple(n_split, 0.0) + getRhoDeltasSimple(streamline_length-n_split, 0.0, 1.5) 
+preferences = [ 0 ] * n_split + [ array([0,0,1.0,0]) ] * n_split2
 
-visualizeWithStreamlines(phasta, "rho_modified_reconsideration_sure", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_sure_reluctant", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -151,21 +152,21 @@ visualizeWithStreamlines(phasta, "rho_modified_reconsideration_sure",
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoint,
     noise_seed=noise_seed,
-    rho_deltas=rho_deltas,
+    preferences=preferences,
 )
 
 
 
-rho_deltas = getRhoDeltasSimple(n_split, 0.0) + getRhoDeltasSimple(streamline_length-n_split, 4.0, 6.0) 
+preferences = [ 0 ] * n_split + [ array([0,0.0,20,0]) ] * n_split2
 
-visualizeWithStreamlines(phasta, "rho_modified_latehyperdecisiveness", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_hyperdecisive", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
     coloration_strides=[0,n_split, streamline_length], 
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoint,
-    rho_deltas=rho_deltas,
+    preferences=preferences,
     noise_seed=noise_seed,
 )
 

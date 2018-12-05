@@ -50,6 +50,7 @@ def _step(statevector,  #modified in-place
           #inputs:
           phaseVelocityExponentInput, 
           BiasMatrix, 
+          competingStateGreediness,
           phasesInput, 
           velocityAdjustmentGain, 
           noise_velocity,
@@ -130,7 +131,7 @@ def _step(statevector,  #modified in-place
         #compute the growth rate adjustment depending on the signs of the state and rho:
         #original SHC behavior: alpha_delta=_np.dot(stateConnectivity*rhoDelta, statesigns*x)
         rhodelta_mask = 1.0 * ( stateConnectivity * statesignsOuterProduct > 0.5) #set rhodelta to zero if state sign flips without us wanting it to
-        alpha_delta = _np.dot(rhoDelta*rhodelta_mask, x_abs)
+        alpha_delta = _np.dot(rhoDelta*(rhodelta_mask-competingStateGreediness), x_abs)
 
         #This is the core computation and time integration of the dynamical system:
         growth = alpha + _np.dot(rhoZero, x_abs) + alpha_delta
@@ -271,6 +272,7 @@ class Kernel():
         self.nu = self._sanitizeParam(nu)
         self.epsilon = self._sanitizeParam(epsilon) * self.beta #Wiener process noise
         self.epsilonLambda=0.01 #regularization parameter of activation function
+        self.maxGreediness=10.0  #maximum factor to allow for increasing decisiveness (mainly to guard against input errors)
         self.reuseNoiseSampleTimes = reuseNoiseSampleTimes
         self.stateVectorExponent =stateVectorExponent
         if predecessors is not None:  #convert list of predecessors into list of successors
@@ -337,6 +339,10 @@ class Kernel():
                 stateConnectivity[successor,state] = 1 
         self.stateConnectivity = stateConnectivity
         
+        #compute a matrix that has ones for states that have a common predecessor, i.e. pairs of states which compete (except for self-competition)
+        T_abs = _np.abs(self.stateConnectivity)
+        self.competingStates = _np.dot(T_abs, T_abs.T) * (1-_np.eye(self.numStates))
+        
         #first, fill in the standard values in rhoZero
         # rhoZero = beta^-1 x alpha * (1 - I + alpha^-1 x alpha)
         alphaInv = 1/self.alpha
@@ -344,14 +350,15 @@ class Kernel():
         rhoZero = s * (_np.eye(self.numStates) - 1 - _np.dot(self.alpha[:,_np.newaxis],alphaInv[_np.newaxis,:]))
         
         #then fill the rhoDelta that depends on the state connectivity:
-        rhoDelta = self.stateConnectivity * (self.alpha*self.betaInv*(1+1/self.nu))[:,_np.newaxis]
+        rhoDelta = (self.alpha[:,_np.newaxis]*self.betaInv[_np.newaxis,:]*(1+1/self.nu[:,_np.newaxis]))
         
-        self.rho =  - rhoZero - rhoDelta #save the final result
+        self.rho =  - rhoZero - rhoDelta * self.stateConnectivity #for reference only
         self.rhoZero = rhoZero
         self.rhoDelta = rhoDelta
         successorCountInv = 1.0/_np.maximum(_np.sum(stateConnectivity, axis=0)[_np.newaxis,:],1.0)
         self.BiasMeanBalancingWeights = stateConnectivity * successorCountInv
-
+        
+        self.updateCompetingSuccessorGreediness(1.0)
 
 
 
@@ -391,14 +398,15 @@ class Kernel():
                         self.phasesProgressVelocities, 
                         #inputs
                         self.phaseVelocityExponentInput, 
-                        self.BiasMatrix, 
+                        self.BiasMatrix,
+                        self.competingStateGreediness,
                         self.phasesInput, 
                         self.velocityAdjustmentGain, 
                         self.noise_velocity,
                         #parameters
                         self.numStates, 
                         self.betaInv , 
-                        self.stateConnectivity, 
+                        self.stateConnectivity,
                         self.rhoZero, 
                         self.rhoDelta, 
                         self.alpha, 
@@ -465,6 +473,19 @@ class Kernel():
         """
         self.successors=listoflist
         self._updateRho()
+
+    def updateCompetingSuccessorGreediness(self, greedinesses):
+        """
+        update the preferences for competing successor states
+        
+        This value is considered during a transition away from the predecessor state,
+        i.e. it influences the transition dynamics while honoring the basic state connectivity
+        """
+        greedinesses = _np.asarray(greedinesses)
+        if greedinesses.ndim == 1:
+            greedinesses = greedinesses[_np.newaxis,:]
+        _np.clip(greedinesses, 0.0, self.maxGreediness, out=greedinesses) #ensure useful range of the input
+        self.competingStateGreediness = self.competingStates * (0.5*greedinesses-0.5)
 
 
     def _predecessorListToSuccessorList(self, predecessors):

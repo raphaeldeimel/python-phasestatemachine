@@ -85,7 +85,7 @@ def visualizeWithStreamlines(
     streamlines_commonstartpoint=None, 
     noise_seed = None,
     bias_signal = None,
-    rho_deltas = None,
+    preferences = None,
     ):
 
     n_stream_vertices = [streamline_length]*n_streamlines
@@ -112,8 +112,8 @@ def visualizeWithStreamlines(
         phasta.step()
         for l in range(n_stream_vertices[i]):
             streamline[l,:] = phasta.statevector[dims]
-            if rho_deltas is not None:
-                phasta.rhoDelta[:,:] = rho_deltas[l]
+            if preferences is not None:
+                phasta.updateCompetingSuccessorGreediness(preferences[l])
             phasta.step()
         streamlines.append(streamline)
 
