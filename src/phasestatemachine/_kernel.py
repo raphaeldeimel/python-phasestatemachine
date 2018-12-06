@@ -357,8 +357,6 @@ class Kernel():
         self.rhoDelta = rhoDelta
         successorCountInv = 1.0/_np.maximum(_np.sum(stateConnectivity, axis=0)[_np.newaxis,:],1.0)
         self.BiasMeanBalancingWeights = stateConnectivity * successorCountInv
-        
-        self.updateCompetingSuccessorGreediness(1.0)
 
 
 
@@ -476,16 +474,27 @@ class Kernel():
 
     def updateCompetingSuccessorGreediness(self, greedinesses):
         """
-        update the preferences for competing successor states
+        update the greediness for competing transitions / successor states
+        
+        Low values make the system maintain co-activated transitions for a long time, high values make transitions very competitive.
+            0.0: complete indecisiveness (transitions do not compete at all and may not converge towards an exclusive successor state)
+            0.5: greediness of the original SHC network by [1]
+            20.0: extremely greedy transitions, behaves much like a discrete state machine
         
         This value is considered during a transition away from the predecessor state,
         i.e. it influences the transition dynamics while honoring the basic state connectivity
+        
+        greediness: non-negative vector of size self.numStates or matrix of size (numStates,numStates)
+            scalar: set a common greediness value for all competing transitions
+            vector: greediness values for all competing transitions leading to the related successor state
+            matrix: set greediness value for each competing transition individually
+        
         """
         greedinesses = _np.asarray(greedinesses)
         if greedinesses.ndim == 1:
             greedinesses = greedinesses[_np.newaxis,:]
         _np.clip(greedinesses, 0.0, self.maxGreediness, out=greedinesses) #ensure useful range of the input
-        self.competingStateGreediness = self.competingStates * (0.5*greedinesses-0.5)
+        self.competingStateGreediness = self.competingStates * (greedinesses-0.5)
 
 
     def _predecessorListToSuccessorList(self, predecessors):

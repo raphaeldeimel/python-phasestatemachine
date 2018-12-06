@@ -75,9 +75,9 @@ def getListOfPreferenceVectors(n, decisiveness=0.0, reconsideration=0.0, alpha =
     return rhoDeltas
 
 
-preferences = [ 1.0 ] * streamline_length
+preferences = [ 0.5 ] * streamline_length
 
-visualizeWithStreamlines(phasta, "stategreediness_original", 
+visualizeWithStreamlines(phasta, "stategreediness_original_05", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -92,7 +92,7 @@ visualizeWithStreamlines(phasta, "stategreediness_original",
 
 preferences = [ 0.0 ] * streamline_length #maximum indecision
 
-visualizeWithStreamlines(phasta, "stategreediness_indecisive", 
+visualizeWithStreamlines(phasta, "stategreediness_indecisive_0", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -107,7 +107,7 @@ visualizeWithStreamlines(phasta, "stategreediness_indecisive",
 preferences = [ 8.0 ] * streamline_length #hyperdecisive
 
 
-visualizeWithStreamlines(phasta, "stategreediness_decisive", 
+visualizeWithStreamlines(phasta, "stategreediness_decisive_8", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -126,9 +126,9 @@ print(phasta.rhoZero)
 n_split = 70
 n_split2 = streamline_length-n_split
 
-preferences = [ 0 ] * n_split + [ array([0,1.0,4.0,0]) ] * n_split2
+preferences = [ 0 ] * n_split + [ array([0,0.5,2.0,0]) ] * n_split2
 
-visualizeWithStreamlines(phasta, "stategreediness_reconsideration_moderatelysure", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_moderatelysure_05_2", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -144,7 +144,7 @@ visualizeWithStreamlines(phasta, "stategreediness_reconsideration_moderatelysure
 
 preferences = [ 0 ] * n_split + [ array([0,0,1.0,0]) ] * n_split2
 
-visualizeWithStreamlines(phasta, "stategreediness_reconsideration_sure_reluctant", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_sure_reluctant_0_1", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
@@ -159,7 +159,7 @@ visualizeWithStreamlines(phasta, "stategreediness_reconsideration_sure_reluctant
 
 preferences = [ 0 ] * n_split + [ array([0,0.0,20,0]) ] * n_split2
 
-visualizeWithStreamlines(phasta, "stategreediness_reconsideration_hyperdecisive", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_hyperdecisive_0_20", 
     spread=spread, 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
