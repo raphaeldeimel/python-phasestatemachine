@@ -50,6 +50,7 @@ catkin_python_setup()
 add_message_files(
   FILES
   Biases.msg
+  Greedinesses.msg
   PhasesActivations.msg
   SpeedExponentials.msg
   StateVector.msg
