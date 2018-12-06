@@ -13,7 +13,7 @@ import itertools
 from numba import jit
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def _limit(a):
     """ 
     faster version of numpy clip, also modifies array in place
@@ -30,7 +30,7 @@ def _limit(a):
                 a[i,j] = 1.0
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def _signfunc(x):
      return 1.0-2*(x<0)
 
@@ -41,7 +41,7 @@ def _signfunc(x):
 #     return _np.tanh(x/epsilon)
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def _step(statevector,  #modified in-place
           dotstatevector, #modified in-place 
           activationMatrix, #modified in-place 

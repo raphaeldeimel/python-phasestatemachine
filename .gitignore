@@ -4,3 +4,5 @@ paper_examples/__pycache__/
 paper_examples/figures/
 
 *.pyc
+
+src/phasestatemachine/__pycache__/
