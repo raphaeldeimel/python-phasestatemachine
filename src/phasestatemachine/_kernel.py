@@ -78,7 +78,8 @@ def _step(statevector,  #modified in-place
         the function modifies several arguments (numpy arrays) in place.
         """
         #compute adjustment to the instantaneously effective growth factor
-        kd = 2**_np.sum(activationMatrix * phaseVelocityExponentInput) 
+        scaledactivation = activationMatrix * (1.0 / max(1.0, _np.sum(activationMatrix)))
+        kd = 2** _np.sum( scaledactivation * phaseVelocityExponentInput)
         
         #compute mu for phase control:
         phaseerrors = activationMatrix * (phasesInput-phasesMatrix)
