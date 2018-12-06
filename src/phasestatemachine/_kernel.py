@@ -50,7 +50,7 @@ def _step(statevector,  #modified in-place
           #inputs:
           phaseVelocityExponentInput, 
           BiasMatrix, 
-          competingStateGreediness,
+          competingTransitionGreediness,
           phasesInput, 
           velocityAdjustmentGain, 
           noise_velocity,
@@ -132,7 +132,7 @@ def _step(statevector,  #modified in-place
         #compute the growth rate adjustment depending on the signs of the state and rho:
         #original SHC behavior: alpha_delta=_np.dot(stateConnectivity*rhoDelta, statesigns*x)
         rhodelta_mask = 1.0 * ( stateConnectivity * statesignsOuterProduct > 0.5) #set rhodelta to zero if state sign flips without us wanting it to
-        alpha_delta = _np.dot(rhoDelta*(rhodelta_mask-competingStateGreediness), x_abs)
+        alpha_delta = _np.dot(rhoDelta*(rhodelta_mask-competingTransitionGreediness), x_abs)
 
         #This is the core computation and time integration of the dynamical system:
         growth = alpha + _np.dot(rhoZero, x_abs) + alpha_delta
@@ -398,7 +398,7 @@ class Kernel():
                         #inputs
                         self.phaseVelocityExponentInput, 
                         self.BiasMatrix,
-                        self.competingStateGreediness,
+                        self.competingTransitionGreediness,
                         self.phasesInput, 
                         self.velocityAdjustmentGain, 
                         self.noise_velocity,
@@ -473,7 +473,7 @@ class Kernel():
         self.successors=listoflist
         self._updateRho()
 
-    def updateCompetingSuccessorGreediness(self, greedinesses):
+    def updateCompetingTransitionGreediness(self, greedinesses):
         """
         update the greediness for competing transitions / successor states
         
@@ -495,7 +495,8 @@ class Kernel():
         if greedinesses.ndim == 1:
             greedinesses = greedinesses[_np.newaxis,:]
         _np.clip(greedinesses, 0.0, self.maxGreediness, out=greedinesses) #ensure useful range of the input
-        self.competingStateGreediness = self.competingStates * (greedinesses-0.5)
+        self.competingTransitionGreediness = self.competingStates * (greedinesses-0.5)
+        print(self.competingTransitionGreediness)
 
 
     def _predecessorListToSuccessorList(self, predecessors):
