@@ -496,7 +496,6 @@ class Kernel():
             greedinesses = greedinesses[_np.newaxis,:]
         _np.clip(greedinesses, 0.0, self.maxGreediness, out=greedinesses) #ensure useful range of the input
         self.competingTransitionGreediness = self.competingStates * (greedinesses-0.5)
-        print(self.competingTransitionGreediness)
 
 
     def _predecessorListToSuccessorList(self, predecessors):
