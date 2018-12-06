@@ -595,6 +595,8 @@ class Kernel():
         limits[j,i]: exponent for the transition from i to j
         limits[i,i]: 0 (enforced implicitly)
         
+        if limits is a vector: treat it as common exponent for transitions of the same predecessor state
+        if limits is a scalar: set as common exponent for all transitions
         
         While phase velocity can also be controlled by the self.alpha vector directly, 
         large variations to individual states' alpha parameter can alter the 
@@ -602,7 +604,14 @@ class Kernel():
         
         This method here effectly "scales" the timeline during transitions
         """
-        _np.copyto(self.phaseVelocityExponentInput, limits)
+        limits = _np.asarray(limits)
+        if limits.ndim == 2:
+            _np.copyto(self.phaseVelocityExponentInput, limits)
+        elif limits.ndim == 1:
+            limits = limits[_np.newaxis,:]
+        elif limits.ndim == 0:
+            limits = limits[_np.newaxis,_np.newaxis]
+        self.phaseVelocityExponentInput[:,:] = limits
         _np.fill_diagonal(self.phaseVelocityExponentInput , 0)
 
     def getHistory(self):
