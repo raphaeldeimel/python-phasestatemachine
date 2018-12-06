@@ -239,7 +239,7 @@ class Kernel():
             alphaTime=None, 
             alpha=40.0, 
             epsilon=1e-9,
-            nu=1.5,  
+            nu=1.0,  
             beta=1.0, 
             dt=1e-2, 
             stateVectorExponent=2.0,
