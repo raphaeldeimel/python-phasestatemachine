@@ -296,6 +296,7 @@ class Kernel():
         self.phasesInput = _np.zeros((self.numStates,self.numStates)) #input to synchronize state transitions (slower/faster)
         self.velocityAdjustmentGain = _np.zeros((self.numStates,self.numStates))  #gain of the control enslaving the given state transition
         self.phaseVelocityExponentInput = _np.zeros((self.numStates,self.numStates))  #contains values that limit transition velocity
+        self.competingTransitionGreediness = _np.zeros((self.numStates,self.numStates)) #contains values that adjust transition greediness
         
         #internal data structures
         if self.numStates != oldcount or reset: #force a reset if number of states change
@@ -512,10 +513,10 @@ class Kernel():
         #add up both adjustments
         self.competingTransitionGreediness = adjustment_transitions_predecessor_successors + adjustement_transitions_competingsuccessors
 
-        print(greedinesses_competingstates)
-        print(ungreediness_successorstates)
-        print(greediness_predecessor)
-        print(self.competingTransitionGreediness)
+        #print(greedinesses_competingstates)
+        #print(ungreediness_successorstates)
+        #print(ungreediness_predecessor)
+        #print(self.competingTransitionGreediness)
 
 
     def _predecessorListToSuccessorList(self, predecessors):
