@@ -132,7 +132,7 @@ def _step(statevector,  #modified in-place
         #compute the growth rate adjustment depending on the signs of the state and rho:
         #original SHC behavior: alpha_delta=_np.dot(stateConnectivity*rhoDelta, statesigns*x)
         rhodelta_mask = 1.0 * ( stateConnectivity * statesignsOuterProduct > 0.5) #set rhodelta to zero if state sign flips without us wanting it to
-        alpha_delta = _np.dot(rhoDelta*(rhodelta_mask-competingTransitionGreediness), x_abs)
+        alpha_delta = _np.dot(rhoDelta*(rhodelta_mask+competingTransitionGreediness), x_abs)
 
         #This is the core computation and time integration of the dynamical system:
         growth = alpha + _np.dot(rhoZero, x_abs) + alpha_delta
@@ -361,7 +361,6 @@ class Kernel():
         self.BiasMeanBalancingWeights = stateConnectivity * successorCountInv
 
 
-
     def step(self, until=None, period=None, nr_steps=1):
             """
             Main algorithm, implementing the integration step, state space decomposition, phase control and velocity adjustment.
@@ -480,13 +479,14 @@ class Kernel():
         
         Low values make the system maintain co-activated transitions for a long time, high values make transitions very competitive.
             0.0: complete indecisiveness (transitions do not compete at all and may not converge towards an exclusive successor state)
-            0.5: greediness of the original SHC network by [1]
+            1.0: behavior of the original SHC network by [1]
             20.0: extremely greedy transitions, behaves much like a discrete state machine
+            negative values: abort transition and return to the predecessor state
         
         This value is considered during a transition away from the predecessor state,
         i.e. it influences the transition dynamics while honoring the basic state connectivity
         
-        greediness: non-negative vector of size self.numStates or matrix of size (numStates,numStates)
+        greediness: vector of size self.numStates or matrix of size (numStates,numStates)
             scalar: set a common greediness value for all competing transitions
             vector: greediness values for all competing transitions leading to the related successor state
             matrix: set greediness value for each competing transition individually
@@ -495,8 +495,27 @@ class Kernel():
         greedinesses = _np.asarray(greedinesses)
         if greedinesses.ndim == 1:
             greedinesses = greedinesses[_np.newaxis,:]
-        _np.clip(greedinesses, 0.0, self.maxGreediness, out=greedinesses) #ensure useful range of the input
-        self.competingTransitionGreediness = self.competingStates * (greedinesses-0.5)
+        
+        #first, scale greediness and compute un-greediness:
+        g = 1-greedinesses
+        greedinesses_competingstates = 1 - self.nu_term**(g)
+        ungreediness_successorstates = 1 - self.nu_term**( (greedinesses**2-1))
+        
+        #then, compute a mean ungreediness for all competing transitions, and reduce the imbalance of growth factors between predecessor and successor states accordingly:
+        ungreediness_predecessor = _np.sum(self.stateConnectivity.T * ungreediness_successorstates, axis=1) / _np.sum(self.stateConnectivity.T, axis=1)
+        adjustment_transitions_predecessor_successors_oneway = 0.5*ungreediness_predecessor[:,_np.newaxis] * self.stateConnectivity.T
+        adjustment_transitions_predecessor_successors = adjustment_transitions_predecessor_successors_oneway.T - adjustment_transitions_predecessor_successors_oneway
+        
+        #Adjust competition between nodes according to their greediness:
+        adjustement_transitions_competingsuccessors = self.competingStates * greedinesses_competingstates
+        
+        #add up both adjustments
+        self.competingTransitionGreediness = adjustment_transitions_predecessor_successors + adjustement_transitions_competingsuccessors
+
+        print(greedinesses_competingstates)
+        print(ungreediness_successorstates)
+        print(greediness_predecessor)
+        print(self.competingTransitionGreediness)
 
 
     def _predecessorListToSuccessorList(self, predecessors):
