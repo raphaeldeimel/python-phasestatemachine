@@ -271,6 +271,7 @@ class Kernel():
         self.beta = self._sanitizeParam(beta)
         self.betaInv = 1.0/self.beta             #this is used often, so precompute once
         self.nu = self._sanitizeParam(nu)
+        self.nu_term = self.nu/(1 + self.nu)  #equations usually use this term - precompute it
         self.epsilon = self._sanitizeParam(epsilon) * self.beta #Wiener process noise
         self.epsilonLambda=0.01 #regularization parameter of activation function
         self.maxGreediness=10.0  #maximum factor to allow for increasing decisiveness (mainly to guard against input errors)
@@ -351,7 +352,7 @@ class Kernel():
         rhoZero = s * (_np.eye(self.numStates) - 1 - _np.dot(self.alpha[:,_np.newaxis],alphaInv[_np.newaxis,:]))
         
         #then fill the rhoDelta that depends on the state connectivity:
-        rhoDelta = (self.alpha[:,_np.newaxis]*self.betaInv[_np.newaxis,:]*(1+1/self.nu[:,_np.newaxis]))
+        rhoDelta = (self.alpha[:,_np.newaxis]*self.betaInv[_np.newaxis,:] / self.nu_term[:,_np.newaxis])
         
         self.rho =  - rhoZero - rhoDelta * self.stateConnectivity #for reference only
         self.rhoZero = rhoZero
