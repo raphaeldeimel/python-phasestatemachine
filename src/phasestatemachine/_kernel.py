@@ -498,9 +498,9 @@ class Kernel():
             greedinesses = greedinesses[_np.newaxis,:]
         
         #first, scale greediness and compute un-greediness:
-        g = 1-greedinesses
-        greedinesses_competingstates = 1 - self.nu_term**(g)
-        ungreediness_successorstates = 1 - self.nu_term**( (greedinesses**2-1))
+        g = self.nu_term**(-greedinesses)
+        greedinesses_competingstates = 1 - self.nu_term * g
+        ungreediness_successorstates = 1 - 1.0  / (self.nu_term * g)
         
         #then, compute a mean ungreediness for all competing transitions, and reduce the imbalance of growth factors between predecessor and successor states accordingly:
         ungreediness_predecessor = _np.sum(self.stateConnectivity.T * ungreediness_successorstates, axis=1) / _np.sum(self.stateConnectivity.T, axis=1)
