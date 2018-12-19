@@ -244,6 +244,7 @@ class Kernel():
             beta=1.0, 
             dt=1e-2, 
             stateVectorExponent=2.0,
+            initialState=0,
             nonlinearityLambda='kumaraswamy1,1',
             nonlinearityPsi='kumaraswamy1,1',
             reuseNoiseSampleTimes = 10,
@@ -277,6 +278,9 @@ class Kernel():
         self.maxGreediness=10.0  #maximum factor to allow for increasing decisiveness (mainly to guard against input errors)
         self.reuseNoiseSampleTimes = reuseNoiseSampleTimes
         self.stateVectorExponent =stateVectorExponent
+        if initialState >= self.numStates:
+            raise ValueError()
+        self.initialState = initialState
         if predecessors is not None:  #convert list of predecessors into list of successors
             self.successors = self._predecessorListToSuccessorList(predecessors)
         else:
@@ -302,7 +306,7 @@ class Kernel():
         if self.numStates != oldcount or reset: #force a reset if number of states change
             self.statevector = _np.zeros((numStates))
             self.dotstatevector = _np.zeros((numStates))
-            self.statevector[0] = self.beta[0] #start at state 0
+            self.statevector[self.initialState] = self.beta[self.initialState] #start at a state 
             self.phasesActivation = _np.zeros((self.numStates,self.numStates))
             self.phasesProgress = _np.zeros((self.numStates,self.numStates))
             self.phasesProgressVelocities = _np.zeros((self.numStates,self.numStates))
