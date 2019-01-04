@@ -18,7 +18,6 @@ import matplotlib
 from mpl_toolkits.mplot3d import Axes3D
 
 
-
 def plotLineWithVariableWidth(axis, x,y,s, color=None):
     points = _np.array([x, y]).T.reshape(-1, 1, 2)
     segments = _np.concatenate([points[:-1], points[1:]], axis=1)
@@ -74,7 +73,6 @@ def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True, 
 def visualizeWithStreamlines(
     phasta, 
     name, 
-    spread=0.05,
     n_streamlines = 50, 
     streamline_length=100, 
     coloration_strides=5, 
@@ -83,9 +81,10 @@ def visualizeWithStreamlines(
     limits = [0, 1.05], 
     dims=[0,1,2], 
     streamlines_commonstartpoint=None, 
-    noise_seed = None,
-    bias_signal = None,
-    preferences = None,
+    biases = None,
+    biases_per_streamline = None,
+    greedinesses = None,
+    cull=1,
     ):
 
     n_stream_vertices = [streamline_length]*n_streamlines
@@ -96,25 +95,31 @@ def visualizeWithStreamlines(
         coloration_strides[-1]  = streamline_length
     else:
         coloration_strides = _np.asarray(coloration_strides)
-    if noise_seed is None:
-        noise_seed = (_np.random.uniform(size=(phasta.numStates, n_streamlines))*2*spread-spread)
     
+    if biases is not None or biases_per_streamline is not None:
+        if biases is None:
+            biases = _np.zeros((streamline_length))
+        if biases_per_streamline is None:
+            biases_per_streamline = _np.zeros((n_streamlines))
 
     streamlines = []
     for i in range(n_streamlines):
         streamline = _np.zeros((n_stream_vertices[i],3))
-        if streamlines_commonstartpoint is None:
-            streamline_nextstart = phasta.statevector 
-        else:
-            streamline_nextstart = streamlines_commonstartpoint
-        phasta.statevector[:] = streamline_nextstart #+ noise_seed[:,i]
-        phasta.updateTransitionTriggerInput(noise_seed[:,i])
-        phasta.step()
+        if streamlines_commonstartpoint is not None:
+            streamlines_commonstartpoint = _np.asarray(streamlines_commonstartpoint)
+            if _np.ndim(streamlines_commonstartpoint) == 2:
+                phasta.statevector[:] = streamlines_commonstartpoint[i,:]
+            else:
+                phasta.statevector[:] = streamlines_commonstartpoint
+
         for l in range(n_stream_vertices[i]):
             streamline[l,:] = phasta.statevector[dims]
-            if preferences is not None:
-                phasta.updateCompetingSuccessorGreediness(preferences[l])
-            phasta.step()
+            if greedinesses is not None:
+                phasta.updateCompetingTransitionGreediness(greedinesses[l])
+            if biases is not None:
+                phasta.updateBiases(biases[l] + biases_per_streamline[i])
+            for k in range(cull):
+                phasta.step()
         streamlines.append(streamline)
 
 
