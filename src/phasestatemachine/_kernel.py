@@ -575,6 +575,10 @@ class Kernel():
         else:
             self.BiasMatrix[:,:] = bias
 
+    def updateB(self, successorBias):
+        _warnings.warn("Please replace updateB() with updateBiases() asap!",stacklevel=2)
+        self.updateBiases(successorBias)
+
     def updateTransitionTriggerInput(self, successorBias):
         _warnings.warn("Please replace updateTransitionTriggerInput() with updateBiases() asap!",stacklevel=2)
         self.updateBiases(successorBias)
