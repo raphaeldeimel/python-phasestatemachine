@@ -125,7 +125,7 @@ def _step(statevector,  #modified in-place
         statesigns = _signfunc(statevector)
         statesignsOuterProduct = _np.outer(statesigns,statesigns)
 
-        #stateVectorExponent=1  #straight channels: |x|  (original SHC)
+        #stateVectorExponent=1  #straight channels: |x|  (original SHC by Horchler/Rabinovich)
         #stateVectorExponent=2  #spherical channels: |x|**2
         x_abs = (statevector*statesigns)**stateVectorExponent
         
@@ -356,7 +356,7 @@ class Kernel():
         s = _np.dot(self.alpha[:,_np.newaxis],self.betaInv[_np.newaxis,:])
         rhoZero = s * (_np.eye(self.numStates) - 1 - _np.dot(self.alpha[:,_np.newaxis],alphaInv[_np.newaxis,:]))
         
-        #then fill the rhoDelta that depends on the state connectivity:
+        #then fill the rhoDelta:
         rhoDelta = (self.alpha[:,_np.newaxis]*self.betaInv[_np.newaxis,:] / self.nu_term[:,_np.newaxis])
         
         self.rho =  - rhoZero - rhoDelta * self.stateConnectivity #for reference only
