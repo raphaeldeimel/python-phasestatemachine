@@ -12,6 +12,8 @@ import pandas as _pd
 import itertools
 from numba import jit
 
+import warnings as _warnings
+
 
 @jit(nopython=True, cache=True)
 def _limit(a):
@@ -311,7 +313,6 @@ class Kernel():
             self.phasesProgress = _np.zeros((self.numStates,self.numStates))
             self.phasesProgressVelocities = _np.zeros((self.numStates,self.numStates))
             self.biases = _np.zeros((self.numStates, self.numStates))
-            self._biasMask = (1-_np.eye((self.numStates)))
             self.noise_velocity = 0.0
             self.noiseValidCounter = 0
             #these data structures are used to save the history of the system:
@@ -550,7 +551,7 @@ class Kernel():
         return successors
 
 
-    def updateB(self, successorBias):
+    def updateBiases(self, successorBias):
         """
         changes the "bias" input array
         
@@ -559,41 +560,22 @@ class Kernel():
         Large, short spikes can be used to override any state and force the system into any state, 
         regardless of state connectivity
         
-        successorBias: matrix of biases for each (successor state, current state) 
-       
-        Note: states cannot be their own successors, so these values ignored!
-        
-        Note 2: predecessor bias is set from the mean bias across succesor states
-        """
-        bias = _np.asarray(successorBias)
-        #balance the means between successor and predecessors:
-#        offsets = self.BiasMeanBalancingWeights  * _np.sum( (self.stateConnectivity+_np.eye(self.numStates)) * bias, axis=0)
-        offsets = _np.sum( self.BiasMeanBalancingWeights * bias, axis=0)
-        self.BiasMatrix = self._biasMask * bias #+ _np.diag(offsets)
-        
-    def updateTransitionTriggerInput(self, successorBias):
-        """
-        changes the "bias" input array (or vector)
-        
-        Small values bias the system to hasten transitions towards that state
-        
-        Large, short spikes can be used to override any state and force the system into any state, 
-        regardless of state connectivity
-        
-        successorBias: 
+        successorBias: numpy array of biases for each (successor state biased towards, current state) pair
+
             if scalar:  set all successor biases to the same value
             if vector:  set successor biases to the given vector for every state
             if matrix:  set each (successor state, current state) pair individually
        
-        Note: states cannot be their own successors, so these values ignored!                
         """
-        bias = _np.asarray(successorBias)
-        if bias.ndim == 0:
-            self.updateB(bias * self.stateConnectivity)
+        bias = _np.asarray(successorBias)        
         if bias.ndim == 1:
-            self.updateB(bias[:, _np.newaxis] * self.stateConnectivity)
-        elif bias.ndim == 2:
-            self.updateB(bias)
+            self.BiasMatrix[:,:] = bias[:, _np.newaxis]
+        else:
+            self.BiasMatrix[:,:] = bias
+
+    def updateTransitionTriggerInput(self, successorBias):
+        _warnings.warn("Please replace updateTransitionTriggerInput() with updateBiases() asap!",stacklevel=2)
+        self.updateBiases(successorBias)
         
     def updatePhasesInput(self, phases):
         """
