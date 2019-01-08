@@ -27,7 +27,7 @@ x0diag = betainc(5,5,linspace(-0.01,1.01,n))
 isolinevalues = linspace(0,1, 10)
 
 
-def f_proposed1(x0,x1):
+def f_proposed1(x0,x1, x2=0.001):
     """
     
     proposed function: 
@@ -39,15 +39,15 @@ def f_proposed1(x0,x1):
     
     """
     xxt = x1 * x0
-    L2_squared = x1**2 + x0**2 #xtx
-    L1 = abs(x1)+abs(x0)
-    epsilon=0.001
-    return 8 * xxt * (L2_squared)  / (L1**4 + epsilon)
+    L2_squared = x2**2 + x1**2 + x0**2 #xtx
+    L1 = abs(x2)+abs(x1)+abs(x0)
+    S_P = abs(x1)+abs(x0)
+    return 16 * xxt * (L2_squared)  / (L1**4 + S_P**4)
 
-def f_proposed2(x0,x1):
-    return 1-(1-f_proposed1(x0,x1)**2)**2 #kumaraswamy(1,2)
+def f_proposed2(x0,x1, x2=0.00001):
+    return 1-(1-f_proposed1(x0,x1, x2)**2)**2 #kumaraswamy(1,2)
 
-def f_proposed3(x0,x1):
+def f_proposed3(x0,x1, x2=0.00001):
     """
     
     proposed function: 
@@ -59,13 +59,25 @@ def f_proposed3(x0,x1):
     
     """
     xxt = x1 * x0
-    L2_squared = x1**2 + x0**2 #xtx
-    L1 = abs(x1)+abs(x0)
-    epsilon=0.04**2
-    return 8 * xxt**3 * L2_squared / ( (1-epsilon)*(L1)**4 * xxt**2 + epsilon)
+    L2_squared = x2**2 + x1**2 + x0**2 #xtx
+    L1 = abs(x2)+abs(x1)+abs(x0)
+    return 8 * xxt**3 * L2_squared / ( (L1)**4 * xxt**2)
+
+def f_proposed1_cross(x1,x2, x0=0.3):
+    """
+    
+    proposed function: 
+    
+        Matrix X:
+        X = x^nx1 . 1^1xn
+        
+        lambda = X @ X.T * 8 * (X*X + (X*X).T) / (sum(|X|) + 0.01)**4
+    
+    """
+    return f_proposed1(x0, x2, x2)
 
 traces= []
-for f, name in [(f_proposed1, 'proposed_activation_function_1'), (f_proposed2, 'proposed_activation_function_2'),(f_proposed3, 'proposed_activation_function_3') ]:
+for f, name in [(f_proposed1, 'proposed_activation_function_1'), (f_proposed2, 'proposed_activation_function_2'),(f_proposed3, 'proposed_activation_function_3'),(f_proposed1_cross, 'proposed_activation_function_1_competingstates') ]:
     ax = Axes3D(figure(dpi=300))
     ax.view_init(elev=20., azim=-165)
     #ax.mouse_init(rotate_btn=1, zoom_btn=3)

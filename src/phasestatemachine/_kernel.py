@@ -127,9 +127,10 @@ def _step(statevector,  #modified in-place
         statesigns = _signfunc(statevector)
         statesignsOuterProduct = _np.outer(statesigns,statesigns)
 
+        statevector_abs = statevector*statesigns
         #stateVectorExponent=1  #straight channels: |x|  (original SHC by Horchler/Rabinovich)
         #stateVectorExponent=2  #spherical channels: |x|**2
-        x_abs = (statevector*statesigns)**stateVectorExponent
+        x_abs = statevector_abs**stateVectorExponent
 #        x_abs = ( (statevector+biases)/(1+biases) * statesigns)**stateVectorExponent 
 #        x_abs = ( (statevector * statesigns)**stateVectorExponent +biases)/(1+biases)
         
@@ -145,14 +146,14 @@ def _step(statevector,  #modified in-place
         statevector[:] = (statevector + dotstatevector*dt + noise_statevector)   #set the new state 
         
         #prepare a normalized state vector for the subsequent operations:
-        statevector_scaled = statevector*betaInv
-        SP = _np.outer(statevector, statevector)
-        P = statevector.reshape((1,numStates))
-        P2 = P*P
+        P = statevector_abs.reshape((1,numStates))
         S = P.T
-        S2 = P2.T
+        S2 = S*S
+        SP = _np.outer(statevector_abs, statevector_abs)
+        statevectorL1 = _np.sum(S)
+        statevectorL2 = _np.sum(S2)
         #compute the transition/state activation matrix (Lambda)
-        activations = SP * 8 * (P2 + S2) / ((P + S)**4  + epsilonLambda) 
+        activations = SP * 16 * (statevectorL2) / (((S+P)**4+statevectorL1**4))
         activationMatrix[:,:] =  activations * stateConnectivity #function shown in visualization_of_activationfunction.py
         _limit(activationMatrix)
         #apply nonlinearity:
@@ -160,7 +161,7 @@ def _step(statevector,  #modified in-place
             activationMatrix[:,:] = 1.0-(1.0-activationMatrix**nonlinearityParamsLambda[0])**nonlinearityParamsLambda[1] #Kumaraswamy CDF
         
         #compute the state activation and put it into the diagonal of Lambda:
-        residual = _np.prod(1-activationMatrix) 
+        residual = 1.0-_np.sum(activationMatrix)
         stateactivation_normalized = S2/ _np.sum(S2) 
         for i in range(numStates):
             activationMatrix[i,i] =  stateactivation_normalized[i,0] * residual
