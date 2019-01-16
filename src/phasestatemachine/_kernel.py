@@ -170,7 +170,7 @@ def _step(statevector,  #modified in-place
                 
         #compute the phase progress matrix (Psi)
         epsilonPsi = 0.0001
-        newphases = (S+epsilonPsi) / (S+P+2*epsilonPsi)
+        newphases = (S+epsilonPsi) / (S_plus_P+2*epsilonPsi)
         _limit(newphases)
         #apply nonlinearity:
         if (nonlinearityParamsPsi[0] != 1.0 or nonlinearityParamsPsi[1] != 1.0 ):
