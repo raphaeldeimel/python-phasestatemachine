@@ -509,15 +509,14 @@ class Kernel():
             greedinesses = greedinesses[_np.newaxis,:]
         
         #adjust the strength / reverse direction of the outgoing shc's according to greedinesses:
-        greediness_successorstates = _np.clip(greedinesses-1, -2.0, 0.0) # _np.clip(g, -self.nu_term, 0.0)
+        greediness_successorstates = _np.clip(greedinesses-0.5, -1.0, 0.0) # _np.clip(g, -self.nu_term, 0.0)
         shc_strength = self.stateConnectivity * greediness_successorstates.T
-        adjustment_transitions_predecessor_successors = 0.5*(shc_strength - shc_strength.T)
+        adjustment_transitions_predecessor_successors = (shc_strength - shc_strength.T)
 
-        
         #Adjust competition between nodes according to their greediness:
-        competition_balancer = 0.5 # 1.0 / (_np.sum(self.competingStates, axis=1)+1)        
-        greedinesses_competingstates =  (greedinesses-1) * competition_balancer
-        adjustement_transitions_competingsuccessors = self.competingStates * greedinesses_competingstates
+        greedinesses_competingstates =  (greedinesses-0.5)
+        adjustement_transitions_competingsuccessors_individual = self.competingStates * greedinesses_competingstates
+        adjustement_transitions_competingsuccessors = 1.5* adjustement_transitions_competingsuccessors_individual - 0.5*adjustement_transitions_competingsuccessors_individual.T
         
         #add up both adjustments
         self.stateConnectivityGreedinessAdjustment = adjustment_transitions_predecessor_successors - adjustement_transitions_competingsuccessors
