@@ -123,38 +123,39 @@ def _step(statevector,  #modified in-place
                     noise_statevector[chosensuccessor] = 1.0
             else:
                  triggervalue_successors[:] += biases * dt + noise_velocity
-
+        
+        statevector[:] = statevector
 
         statesigns = _signfunc(statevector)
         statesignsOuterProduct = _np.outer(statesigns,statesigns)
 
-        statevector_abs = statevector*statesigns
+
         #stateVectorExponent=1  #straight channels: |x|  (original SHC by Horchler/Rabinovich)
         #stateVectorExponent=2  #spherical channels: |x|**2
-        x_abs = statevector_abs**stateVectorExponent
-#        x_abs = ( (statevector+biases)/(1+biases) * statesigns)**stateVectorExponent 
-#        x_abs = ( (statevector * statesigns)**stateVectorExponent +biases)/(1+biases)
+        x_gamma = (statevector*statesigns)**stateVectorExponent
+#        x_gamma = ( (statevector+biases)/(1+biases) * statesigns)**stateVectorExponent 
+#        x_gamma = ( (statevector * statesigns)**stateVectorExponent +biases)/(1+biases)
         
         #compute the growth rate adjustment depending on the signs of the state and rho:
         #original SHC behavior: alpha_delta=_np.dot(stateConnectivity*rhoDelta, statesigns*x)
         stateConnectivityMasked = 1.0 * ( stateConnectivity * statesignsOuterProduct > 0.5) #set rhodelta to zero if state sign flips without us wanting it to
-        alpha_delta = _np.dot(rhoDelta*(stateConnectivityMasked+stateConnectivityGreedinessAdjustment), x_abs)
-
+        rhoDeltaMasked = rhoDelta*(stateConnectivityMasked+stateConnectivityGreedinessAdjustment)
+        
         #This is the core computation and time integration of the dynamical system:
-        growth = alpha + _np.dot(rhoZero, x_abs) + alpha_delta
+        growth = alpha + _np.dot(rhoZero+rhoDeltaMasked, x_gamma)
         velocity =  statevector * growth * kd + mu  #estimate velocity  #missing:
         dotstatevector[:] = velocity + velocity_offset #do not add noise to velocity, promp mixer doesnt like it
         statevector[:] = (statevector + dotstatevector*dt + noise_statevector)   #set the new state 
         
         #prepare a normalized state vector for the subsequent operations:
-        P = statevector_abs.reshape((1,numStates))
-        S = P.T
+        statevector_abs = _np.abs(statevector)
+        S = statevector_abs.reshape((numStates,1))
         S2 = S*S
-        SP = _np.outer(statevector_abs, statevector_abs)
+        S_plus_P = S + S.T
         statevectorL1 = _np.sum(S)
         statevectorL2 = _np.sum(S2)
         #compute the transition/state activation matrix (Lambda)
-        activations = SP * 16 * (statevectorL2) / (((S+P)**4+statevectorL1**4))
+        activations = _np.outer(statevector_abs, statevector_abs) * 16 * (statevectorL2) / (S_plus_P**4+statevectorL1**4)
         activationMatrix[:,:] =  activations * stateConnectivity #function shown in visualization_of_activationfunction.py
         _limit(activationMatrix)
         #apply nonlinearity:
