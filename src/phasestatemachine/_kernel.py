@@ -42,6 +42,7 @@ def _signfunc(x):
 #def _signfunc(x, epsilon=1e-3):
 #     return _np.tanh(x/epsilon)
 
+_np.set_printoptions(precision=3, suppress=True)
 
 @jit(nopython=True, cache=True)
 def _step(statevector,  #modified in-place
