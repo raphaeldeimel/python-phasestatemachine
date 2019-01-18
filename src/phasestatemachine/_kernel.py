@@ -133,8 +133,6 @@ def _step(statevector,  #modified in-place
         #stateVectorExponent=1  #straight channels: |x|  (original SHC by Horchler/Rabinovich)
         #stateVectorExponent=2  #spherical channels: |x|**2
         x_gamma = (statevector*statesigns)**stateVectorExponent
-#        x_gamma = ( (statevector+biases)/(1+biases) * statesigns)**stateVectorExponent 
-#        x_gamma = ( (statevector * statesigns)**stateVectorExponent +biases)/(1+biases)
         
         #compute the growth rate adjustment depending on the signs of the state and rho:
         #original SHC behavior: alpha_delta=_np.dot(stateConnectivity*rhoDelta, statesigns*x)
@@ -143,8 +141,7 @@ def _step(statevector,  #modified in-place
         
         #This is the core computation and time integration of the dynamical system:
         growth = alpha + _np.dot(rhoZero+rhoDeltaMasked, x_gamma)
-        velocity =  statevector * growth * kd + mu  #estimate velocity  #missing:
-        dotstatevector[:] = velocity + velocity_offset #do not add noise to velocity, promp mixer doesnt like it
+        dotstatevector[:] = statevector * growth * kd + mu + biases  #estimate velocity. do not add noise to velocity, promp mixer doesnt like jumps
         statevector[:] = (statevector + dotstatevector*dt + noise_statevector)   #set the new state 
         
         #prepare a normalized state vector for the subsequent operations:
@@ -254,6 +251,7 @@ class Kernel():
             initialState=0,
             nonlinearityLambda='kumaraswamy1,1',
             nonlinearityPsi='kumaraswamy1,1',
+            inputFilterTimeConstant = 0.5,
             reuseNoiseSampleTimes = 10,
             reset=False, 
             recordSteps=-1,
@@ -298,8 +296,10 @@ class Kernel():
         self.nonlinearityParamsLambda = _KumaraswamyCDFParameters[nonlinearityLambda]   #nonlinearity for sparsifying activation values
         self.nonlinearityParamsPsi  = _KumaraswamyCDFParameters[nonlinearityPsi]     #nonlinearity that linearizes phase variables 
 
+
         #inputs:
         self.BiasMatrix = _np.zeros((self.numStates,self.numStates)) #determines transition preferences and state timeout duration
+        self.BiasMatrixDesired = _np.zeros((self.numStates,self.numStates)) #determines transition preferences and state timeout duration
 
         self.emulateHybridAutomaton = emulateHybridAutomaton #set this to true to emulate discrete switching behavior on bias input
         self.triggervalue_successors = _np.zeros((self.numStates))
@@ -308,6 +308,8 @@ class Kernel():
         self.velocityAdjustmentGain = _np.zeros((self.numStates,self.numStates))  #gain of the control enslaving the given state transition
         self.phaseVelocityExponentInput = _np.zeros((self.numStates,self.numStates))  #contains values that limit transition velocity
         self.stateConnectivityGreedinessAdjustment = _np.zeros((self.numStates,self.numStates)) #contains values that adjust transition greediness
+
+        self.inputfilterK = dt / inputFilterTimeConstant  #how much inputs should be low-passed (to avoid sudden changes in phasta state)
         
         #internal data structures
         if self.numStates != oldcount or reset: #force a reset if number of states change
@@ -400,6 +402,10 @@ class Kernel():
                 if self.noiseValidCounter <= 0: #do not sample every timestep as the dynamical system cannot react that fast anyway. Effectively low-pass-filters the noise.
                     self.noise_velocity = _np.random.normal(scale = self.epsilonPerSample, size=self.numStates) #sample a discretized wiener process noise
                     self.noiseValidCounter = self.reuseNoiseSampleTimes
+                #low-pass filter input to avoid sudden jumps in velocity
+                self.BiasMatrix += self.inputfilterK * (self.BiasMatrixDesired-self.BiasMatrix) 
+                self.stateConnectivityGreedinessAdjustment += self.inputfilterK * (self.stateConnectivityGreedinessTransitions + self.stateConnectivityGreedinessCompetingSuccessors - self.stateConnectivityGreedinessAdjustment)
+                
                 _step(  #arrays modified in-place:
                         self.statevector, 
                         self.dotstatevector,
@@ -510,17 +516,15 @@ class Kernel():
             greedinesses = greedinesses[_np.newaxis,:]
         
         #adjust the strength / reverse direction of the outgoing shc's according to greedinesses:
-        greediness_successorstates = _np.clip(greedinesses-0.5, -1.0, 0.0) # _np.clip(g, -self.nu_term, 0.0)
+        greediness_successorstates = _np.clip((0.5*greedinesses-0.5), -1.0, 0.0) # _np.clip(g, -self.nu_term, 0.0)
         shc_strength = self.stateConnectivity * greediness_successorstates.T
-        adjustment_transitions_predecessor_successors = (shc_strength - shc_strength.T)
+        self.stateConnectivityGreedinessTransitions = (shc_strength - shc_strength.T)
 
         #Adjust competition between nodes according to their greediness:
-        greedinesses_competingstates =  (greedinesses-0.5)
+        greedinesses_competingstates = (0.5*greedinesses-0.5)
         adjustement_transitions_competingsuccessors_individual = self.competingStates * greedinesses_competingstates
-        adjustement_transitions_competingsuccessors = 1.5* adjustement_transitions_competingsuccessors_individual - 0.5*adjustement_transitions_competingsuccessors_individual.T
+        self.stateConnectivityGreedinessCompetingSuccessors = 0.5*adjustement_transitions_competingsuccessors_individual.T - 1.5* adjustement_transitions_competingsuccessors_individual
         
-        #add up both adjustments
-        self.stateConnectivityGreedinessAdjustment = adjustment_transitions_predecessor_successors - adjustement_transitions_competingsuccessors
 
 
     def updateCompetingTransitionGreediness(self,greedinesses):
@@ -573,9 +577,9 @@ class Kernel():
         """
         bias = _np.asarray(successorBias)        
         if bias.ndim == 1:
-            self.BiasMatrix[:,:] = bias[:, _np.newaxis]
+            self.BiasMatrixDesired[:,:] = (self.stateConnectivity) * bias[:,_np.newaxis]
         else:
-            self.BiasMatrix[:,:] = bias
+            self.BiasMatrixDesired[:,:] = bias
 
     def updateB(self, successorBias):
         _warnings.warn("Please replace updateB() with updateBiases() asap!",stacklevel=2)
