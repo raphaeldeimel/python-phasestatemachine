@@ -523,10 +523,7 @@ class Kernel():
         self.stateConnectivityGreedinessTransitions = (shc_strength - shc_strength.T)
 
         #Adjust competition between nodes according to their greediness:
-        greedinesses_competingstates = (0.5*greedinesses-0.5)
-        adjustement_transitions_competingsuccessors_individual = self.competingStates * greedinesses_competingstates
-        self.stateConnectivityGreedinessCompetingSuccessors = 0.5*adjustement_transitions_competingsuccessors_individual.T - 1.5* adjustement_transitions_competingsuccessors_individual
-        
+        self.stateConnectivityGreedinessCompetingSuccessors = self.competingStates * (0.50-0.5*greedinesses)
 
 
     def updateCompetingTransitionGreediness(self,greedinesses):
