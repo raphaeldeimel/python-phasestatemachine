@@ -514,6 +514,8 @@ class Kernel():
         greedinesses = _np.asarray(greedinesses)
         if greedinesses.ndim == 1:
             greedinesses = greedinesses[_np.newaxis,:]
+        elif greedinesses.ndim == 0:
+            greedinesses = _np.full((1, self.numStates),greedinesses)
         
         #adjust the strength / reverse direction of the outgoing shc's according to greedinesses:
         greediness_successorstates = _np.clip((0.5*greedinesses-0.5), -1.0, 0.0) # _np.clip(g, -self.nu_term, 0.0)
