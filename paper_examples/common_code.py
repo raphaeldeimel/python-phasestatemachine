@@ -76,8 +76,8 @@ def visualizeWithStreamlines(
     n_streamlines = 50, 
     streamline_length=100, 
     coloration_strides=5, 
-    azimut=30, 
-    elevation=60, 
+    azimut=45, 
+    elevation=45, 
     limits = [0, 1.05], 
     dims=[0,1,2], 
     streamlines_commonstartpoint=None, 
@@ -86,7 +86,6 @@ def visualizeWithStreamlines(
     greedinesses = None,
     cull=1,
     ):
-
     n_stream_vertices = [streamline_length]*n_streamlines
 
     if _np.isscalar(coloration_strides):
@@ -111,11 +110,11 @@ def visualizeWithStreamlines(
                 phasta.statevector[:] = streamlines_commonstartpoint[i,:]
             else:
                 phasta.statevector[:] = streamlines_commonstartpoint
-
+            phasta.dotstatevector[:] = 0.0
         for l in range(n_stream_vertices[i]):
             streamline[l,:] = phasta.statevector[dims]
             if greedinesses is not None:
-                phasta.updateCompetingTransitionGreediness(greedinesses[l])
+                phasta.updateGreediness(greedinesses[l])
             if biases is not None:
                 phasta.updateBiases(biases[l] + biases_per_streamline[i])
             for k in range(cull):

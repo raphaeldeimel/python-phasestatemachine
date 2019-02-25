@@ -49,6 +49,7 @@ phasta = phasestatemachine.Kernel(
     dt=plot_dt / cull,
     epsilon=0e-5,
     successors = successors,
+    inputFilterTimeConstant=0.0, #important, so that state doesn't leak across plots...
     recordSteps = 10000,
 )
 
@@ -67,9 +68,6 @@ decision_signal1 = _np.zeros((streamline_length))
 decision_signal2 = _np.zeros((streamline_length))
 
 
-
-print(phasta.competingStates)
-print(_np.dot(phasta.stateConnectivity,phasta.stateConnectivity.T ))
 
 ###############################
 
@@ -124,28 +122,28 @@ visualizeWithStreamlines(phasta, "stategreediness_constant_0",
 
 
 
-visualizeWithStreamlines(phasta, "stategreediness_constant_8", 
-    n_streamlines = n_streamlines, 
-    streamline_length=streamline_length,
-    coloration_strides=10, 
-    dims=[0,1,2], 
-    streamlines_commonstartpoint=startpoints,
-    greedinesses=[ 8.0 ] * streamline_length, #hyperdecisive,
-#    biases_per_streamline=startpoints
-    cull=cull,
-)
+#visualizeWithStreamlines(phasta, "stategreediness_constant_8", 
+#    n_streamlines = n_streamlines, 
+#    streamline_length=streamline_length,
+#    coloration_strides=10, 
+#    dims=[0,1,2], 
+#    streamlines_commonstartpoint=startpoints,
+#    greedinesses=[ 8.0 ] * streamline_length, #hyperdecisive,
+##    biases_per_streamline=startpoints
+#    cull=cull,
+#)
 
 
-visualizeWithStreamlines(phasta, "stategreediness_constant_20", 
-    n_streamlines = n_streamlines, 
-    streamline_length=streamline_length,
-    coloration_strides=10, 
-    dims=[0,1,2], 
-    streamlines_commonstartpoint=startpoints,
-    greedinesses=[ 8.0 ] * streamline_length, #hyperdecisive,
-#    biases_per_streamline=startpoints
-    cull=cull,
-)
+#visualizeWithStreamlines(phasta, "stategreediness_constant_20", 
+#    n_streamlines = n_streamlines, 
+#    streamline_length=streamline_length,
+#    coloration_strides=10, 
+#    dims=[0,1,2], 
+#    streamlines_commonstartpoint=startpoints,
+#    greedinesses=[ 8.0 ] * streamline_length, #hyperdecisive,
+##    biases_per_streamline=startpoints
+#    cull=cull,
+#)
 
 
 visualizeWithStreamlines(phasta, "stategreediness_unbalanced_0_1", 
@@ -230,89 +228,88 @@ visualizeWithStreamlines(phasta, "stategreediness_abort_neg2",
 
 ###############################
 
-n_split = 40
+n_split = 30
 n_split2 = streamline_length-n_split
 
 
-biases = [ [0.0,0.0,0.0,0.0] ] * n_split + [ [0.0, 0.025, 0.1,0.0] ] * n_split2
+biases = [ [0.0,0.0,0.0,0.0] ] * n_split + [ [0.0, 0.00, 0.0,0.0] ] * n_split2
 
-visualizeWithStreamlines(phasta, "stategreediness_reconsideration_05_2", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_1_05", 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
     coloration_strides=[0,n_split, streamline_length], 
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoints,
-    greedinesses=[ 1.0 ] * n_split + [ array([0,0.5,2.0,0]) ] * n_split2,
+    greedinesses=[ 1.0 ] * n_split + [ array([0,1,0.5,0]) ] * n_split2,
     biases=biases,
     cull=cull,
 )
 
 
-
-
-
-visualizeWithStreamlines(phasta, "stategreediness_reconsideration_0_1", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_1_0", 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
     coloration_strides=[0,n_split, streamline_length], 
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoints,
-    greedinesses=[ 1.0 ] * n_split + [ array([0,0,1.0,0]) ] * n_split2,
+    greedinesses= [ array([0,1,1,0]) for a in range(n_split) ] +   [ array([0,  1.0,  0.0,   0]) for a in range(n_split2) ] ,
     biases=biases,    
     cull=cull,
 )
 
 
 
-visualizeWithStreamlines(phasta, "stategreediness_reconsideration_neg1_20", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_1_neg05", 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
     coloration_strides=[0,n_split, streamline_length], 
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoints,
-    greedinesses=[ 1.0 ] * n_split + [ array([0,-1,20,0]) ] * n_split2,
+    greedinesses=[ 1.0 ] * n_split + [ array([0,1,-0.5,0]) ] * n_split2,
     biases=biases,
     cull=cull,
 )
 
 
 
-visualizeWithStreamlines(phasta, "stategreediness_reconsideration_0_20", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_1_neg1", 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
     coloration_strides=[0,n_split, streamline_length], 
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoints,
-    greedinesses=[ 1.0 ] * n_split + [ array([0,0.0,20,0]) ] * n_split2,
+    greedinesses=[ 1.0 ] * n_split + [ array([0,1,-1,0]) ] * n_split2,
     biases=biases,
     cull=cull,
 )
 
 
-visualizeWithStreamlines(phasta, "stategreediness_reconsideration_neg10_10", 
+
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_09_01", 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
     coloration_strides=[0,n_split, streamline_length], 
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoints,
-    greedinesses=[ 1.0 ] * n_split + [ array([0,-10,10,0]) ] * n_split2,
+    greedinesses=[ 1.0 ] * n_split + [ array([0,0.9,0.1,0]) ] * n_split2,
     biases=biases,
     cull=cull,
 )
 
-
-visualizeWithStreamlines(phasta, "stategreediness_reconsideration_1_5", 
+visualizeWithStreamlines(phasta, "stategreediness_reconsideration_20_1", 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
     coloration_strides=[0,n_split, streamline_length], 
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoints,
-    greedinesses=[ 1.0 ] * n_split + [ array([0,1.0,5,0]) ] * n_split2,
+    greedinesses=[ 1.0 ] * n_split + [ array([0,20,1.0,0]) ] * n_split2,
     biases=biases,
     cull=cull,
 )
+
 
 
 if isInteractive():
     ion()
     show()
+    
