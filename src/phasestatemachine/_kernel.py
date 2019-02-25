@@ -251,7 +251,7 @@ class Kernel():
             initialState=0,
             nonlinearityLambda='kumaraswamy1,1',
             nonlinearityPsi='kumaraswamy1,1',
-            inputFilterTimeConstant = 0.5,
+            inputFilterTimeConstant = 0.1,
             reuseNoiseSampleTimes = 10,
             reset=False, 
             recordSteps=-1,
@@ -309,7 +309,7 @@ class Kernel():
         self.phaseVelocityExponentInput = _np.zeros((self.numStates,self.numStates))  #contains values that limit transition velocity
         self.stateConnectivityGreedinessAdjustment = _np.zeros((self.numStates,self.numStates)) #contains values that adjust transition greediness
 
-        self.inputfilterK = dt / inputFilterTimeConstant  #how much inputs should be low-passed (to avoid sudden changes in phasta state)
+        self.inputfilterK = dt / max(dt , inputFilterTimeConstant)  #how much inputs should be low-passed (to avoid sudden changes in phasta state)
         
         #internal data structures
         if self.numStates != oldcount or reset: #force a reset if number of states change
