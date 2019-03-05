@@ -308,6 +308,8 @@ class Kernel():
         self.velocityAdjustmentGain = _np.zeros((self.numStates,self.numStates))  #gain of the control enslaving the given state transition
         self.phaseVelocityExponentInput = _np.zeros((self.numStates,self.numStates))  #contains values that limit transition velocity
         self.stateConnectivityGreedinessAdjustment = _np.zeros((self.numStates,self.numStates)) #contains values that adjust transition greediness
+        self.stateConnectivityGreedinessTransitions = _np.zeros((self.numStates,self.numStates))
+        self.stateConnectivityGreedinessCompetingSuccessors = _np.zeros((self.numStates,self.numStates))
 
         self.inputfilterK = dt / max(dt , inputFilterTimeConstant)  #how much inputs should be low-passed (to avoid sudden changes in phasta state)
         
