@@ -122,17 +122,27 @@ visualizeWithStreamlines(phasta, "stategreediness_constant_0",
 
 
 
-#visualizeWithStreamlines(phasta, "stategreediness_constant_8", 
-#    n_streamlines = n_streamlines, 
-#    streamline_length=streamline_length,
-#    coloration_strides=10, 
-#    dims=[0,1,2], 
-#    streamlines_commonstartpoint=startpoints,
-#    greedinesses=[ 8.0 ] * streamline_length, #hyperdecisive,
-##    biases_per_streamline=startpoints
-#    cull=cull,
-#)
+visualizeWithStreamlines(phasta, "stategreediness_constant_3", 
+    n_streamlines = n_streamlines, 
+    streamline_length=streamline_length,
+    coloration_strides=10, 
+    dims=[0,1,2], 
+    streamlines_commonstartpoint=startpoints,
+    greedinesses=[ 3.0 ] * streamline_length, #hyperdecisive,
+#    biases_per_streamline=startpoints
+    cull=cull,
+)
 
+visualizeWithStreamlines(phasta, "stategreediness_constant_10", 
+    n_streamlines = n_streamlines, 
+    streamline_length=streamline_length,
+    coloration_strides=10, 
+    dims=[0,1,2], 
+    streamlines_commonstartpoint=startpoints,
+    greedinesses=[ 10.0 ] * streamline_length, #hyperdecisive,
+#    biases_per_streamline=startpoints
+    cull=cull,
+)
 
 #visualizeWithStreamlines(phasta, "stategreediness_constant_20", 
 #    n_streamlines = n_streamlines, 
@@ -173,13 +183,13 @@ phasta.updateBiases([0.0,0.0,0.0,0.0])
 b= 0.86
 startpoints_intermediate = array( [ [ (1.0-(b*cos(a))**2-(b*sin(a))**2)**0.5, b*cos(a), b*sin(a), 0.0] for a in linspace(0, 0.5*_np.pi, n_streamlines) ] )
 
-visualizeWithStreamlines(phasta, "stategreediness_abort_05", 
+visualizeWithStreamlines(phasta, "stategreediness_abort_1", 
     n_streamlines = n_streamlines, 
     streamline_length=streamline_length,
     coloration_strides=10, 
     dims=[0,1,2], 
     streamlines_commonstartpoint=startpoints_intermediate,
-    greedinesses= [ 0.5 ] * streamline_length,
+    greedinesses= [ 1.0 ] * streamline_length,
     cull=cull,
 )
 

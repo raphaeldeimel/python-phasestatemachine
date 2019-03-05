@@ -85,6 +85,10 @@ def visualizeWithStreamlines(
     biases_per_streamline = None,
     greedinesses = None,
     cull=1,
+    spread=0.0,
+    noise_seed = None,
+    streamline_width=1.0,
+    streamline_alpha=0.5,
     ):
     n_stream_vertices = [streamline_length]*n_streamlines
 
@@ -94,6 +98,11 @@ def visualizeWithStreamlines(
         coloration_strides[-1]  = streamline_length
     else:
         coloration_strides = _np.asarray(coloration_strides)
+    if noise_seed is None:
+        if spread > 0.0:
+            noise_seed = (_np.random.uniform(size=(phasta.numStates, n_streamlines))*2*spread-spread)
+        else:
+            noise_seed = _np.zeros((phasta.numStates, n_streamlines))
     
     if biases is not None or biases_per_streamline is not None:
         if biases is None:
@@ -109,8 +118,9 @@ def visualizeWithStreamlines(
             if _np.ndim(streamlines_commonstartpoint) == 2:
                 phasta.statevector[:] = streamlines_commonstartpoint[i,:]
             else:
-                phasta.statevector[:] = streamlines_commonstartpoint
+                phasta.statevector[:] = streamlines_commonstartpoint 
             phasta.dotstatevector[:] = 0.0
+        phasta.statevector[:] += noise_seed[:,i]
         for l in range(n_stream_vertices[i]):
             streamline[l,:] = phasta.statevector[dims]
             if greedinesses is not None:
@@ -139,7 +149,7 @@ def visualizeWithStreamlines(
                 c = (l2,l2,l1)
             else:
                 c = (l1,l2,l2)
-            ax.plot(seg[:,0],seg[:,1],seg[:,2], color=c, linewidth=1.0, alpha=0.5)
+            ax.plot(seg[:,0],seg[:,1],seg[:,2], color=c, linewidth=streamline_width, alpha=streamline_alpha)
     ax.set_xlim3d(limits[0],limits[1])
     ax.set_ylim3d(limits[0],limits[1])
     ax.set_zlim3d(limits[0],limits[1])
@@ -147,7 +157,7 @@ def visualizeWithStreamlines(
     ax.set_ylabel('x1')
     ax.set_xlabel('x0')
     plt.savefig('figures/{0}.pdf'.format(name), bbox_inches='tight')
-    plt.savefig('figures/{0}.jpg'.format(name), bbox_inches='tight')
+    #plt.savefig('figures/{0}.jpg'.format(name), bbox_inches='tight')
 
 
 

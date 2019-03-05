@@ -37,9 +37,16 @@ phasta = phasestatemachine.Kernel(
     epsilon=1e-6,
     predecessors = predecessors,
     recordSteps = 10000,
+    
 )
 
-visualizeWithStreamlines(phasta, "example_3states", spread=0.05 ,n_streamlines = 100, streamline_length=60,coloration_strides=1)
+visualizeWithStreamlines(phasta, "example_3states", spread=0.08 ,n_streamlines = 100,
+ azimut=20, 
+ elevation=30, 
+ streamline_width=0.3,
+ streamline_alpha=0.3,    
+ streamline_length=60,
+ coloration_strides=1)
 
 if sys.flags.interactive:
     ion()

@@ -77,7 +77,8 @@ n_split2 = streamline_length-n_split
 biases = [ [0.0,0.0,0.0,0.0] ] * n_split + [ [0.0, 0.00, 0.0,0.0] ] * n_split2
 
 #greedinesses  =  [ array([0,1,1,0]) for a in range(n_split) ] +   [ array([0,  0.875,  0.125,   0]) for a in range(n_split2) ] 
-greedinesses  =  [ array([0,1,1,0]) for a in range(n_split) ] +   [ array([0,  20,  -1,   0]) for a in range(n_split2) ] 
+#greedinesses  =  [ array([0,1,1,0]) for a in range(n_split) ] +   [ array([0,  20,  -1,   0]) for a in range(n_split2) ] 
+greedinesses=[10.0]*streamline_length
 
 visualizeWithStreamlines(phasta, "stategreediness_reconsideration_test", 
     n_streamlines = n_streamlines, 
