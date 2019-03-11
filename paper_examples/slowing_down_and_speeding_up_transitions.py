@@ -34,6 +34,7 @@ predecessors = [
 phaseVelocityExponentsMatrix = [[0., 0., 5.],[-4,0,0.],[0., -7., 0.]]
 
 phasta = phasestatemachine.Kernel(
+    dt=0.001,
     numStates=3,
     predecessors=predecessors,
     recordSteps=100000,

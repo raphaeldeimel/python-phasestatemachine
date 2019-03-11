@@ -41,7 +41,8 @@ ytick.minor.width    : 0.2    # minor tick width in points
 #note: axes.color will be superceded by axes.propcycle with matplotlib > 1.5.0! 
 #axes.color_cycle : 9696ff, 96ff96, ff9696, b4b4b4, 000000, 0000b4, 008000, ff0000, 000000, 000000
 #axes.color_cycle : 303030, ff7676, 7676ff, 76ff76,  b4b4b4,  0000b4, 008000, ff0000, 000000, 000000
-axes.color_cycle : 303030, ff0000, 7676ff, 76ff76,  b4b4b4,  0000b4, 008000, ff0000, 000000, 000000
+#axes.color_cycle : 303030, ff0000, 7676ff, 76ff76,  b4b4b4,  0000b4, 008000, ff0000, 000000, 000000
+axes.prop_cycle    : cycler('color', ['303030', 'ff0000','7676ff','76ff76','b4b4b4','0000b4','008000','ff0000','000000'])
 
 #axes.markers :  -s,-*,-^,-o,-v,-*,-*
 

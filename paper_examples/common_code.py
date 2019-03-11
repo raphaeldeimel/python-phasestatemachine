@@ -18,15 +18,15 @@ import matplotlib
 from mpl_toolkits.mplot3d import Axes3D
 
 
-def plotLineWithVariableWidth(axis, x,y,s, color=None):
-    points = _np.array([x, y]).T.reshape(-1, 1, 2)
+def plotLineWithVariableWidth(axis, x,y,s, color=None, cull=1):
+    points = _np.array([x, y]).T.reshape(-1, 1, 2)[::cull,:,:]
     segments = _np.concatenate([points[:-1], points[1:]], axis=1)
             
-    lc = LineCollection(segments, linewidths=s,color=color, zorder=10)
+    lc = LineCollection(segments, linewidths=s[cull//2::cull],color=color, zorder=10)
     axis.add_collection(lc)
     
     
-def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True, clipActivations=0.01):
+def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True, clipActivations=0.01, cullSteps=1):
     """
     plots a timing diagram of the phase-state machine
     """
@@ -60,8 +60,8 @@ def visualize(phasta, endtime, sectionsAt=None, name="unnamed", newFigure=True, 
     colors = matplotlib.cm.rainbow(_np.linspace(0,1,n_transitions))
     citer = iter(colors)
     #print the data:        
-    [[ plotLineWithVariableWidth(axis, t, i+(j-i)*phasesProgress[:,j,i], phasesActivation[:,j,i], color=next(citer))   for j in p[i]] for i in range(n_states) ]        
-    [  plotLineWithVariableWidth(axis, t[:], [i]*len(t[:]),              phasesActivation[:,i,i], color='black'    ) for i in range(n_states) ]
+    [[ plotLineWithVariableWidth(axis, t, i+(j-i)*phasesProgress[:,j,i], phasesActivation[:,j,i], color=next(citer), cull=cullSteps)   for j in p[i]] for i in range(n_states) ]        
+    [  plotLineWithVariableWidth(axis, t[:], [i]*len(t[:]),              phasesActivation[:,i,i], color='black'    , cull=cullSteps) for i in range(n_states) ]
     
     
     plt.savefig("./figures/phase_evolution_{}.pdf".format(name))

@@ -37,7 +37,7 @@ phasta = phasestatemachine.Kernel(
     recordSteps=100000,
 )
 
-#phasta.updateTransitionTriggerInput(1e-10)
+#phasta.updateBiases(1e-10)
 
 
 #phaseVelocityExponentsMatrix = [[0., 0., -2.],[-2,0,0.],[0., -2., 0.]]
@@ -51,7 +51,7 @@ phaseTarget = numpy.linspace(0, 1.0, int(2.0/phasta.dt))
 phaseTarget = numpy.hstack((numpy.zeros((int(0.5/phasta.dt))), numpy.tile(phaseTarget, 20)))
 
 #negatively bias transition towards states 2-4 to block transition from state 1:
-#phasta.updateTransitionTriggerInput(bias) 
+#phasta.updateBiases(bias) 
 #evolve the system for some time
 for i in range(int(t1/phasta.dt)):
     phasta.step()
