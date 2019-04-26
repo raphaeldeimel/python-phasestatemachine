@@ -32,17 +32,22 @@ predecessors = [
 #Make the first two transitions slower (negative exponent), 
 #and the the third transition faster (positive exponent)
 phaseVelocityExponentsMatrix = [[0., 0., 5.],[-4,0,0.],[0., -7., 0.]]
+phaseVelocityExponentsMatrix2 = [[0., 0., 0],[0,0,0.],[0., -6., 0.]]
 
 phasta = phasestatemachine.Kernel(
     dt=0.001,
     numStates=3,
     predecessors=predecessors,
     recordSteps=100000,
+    epsilon=0.0,
+    
 )
+phasta.updateBiases(3e-9)
 
-
-t1 = 3.2
-t2 = 22.8
+t1 = 3.0
+t2 = 17.0
+t3 = 1.0
+t4 = 5.0
 
 #negatively bias transition towards states 2-4 to block transition from state 1:
 #phasta.updateTransitionTriggerInput(bias) 
@@ -55,5 +60,23 @@ phasta.updateTransitionPhaseVelocityExponentInput(phaseVelocityExponentsMatrix)
 for i in range(int(t2/phasta.dt)):
     phasta.step()
 
-visualize(phasta, t1+t2, sectionsAt=[t1], name=os.path.splitext(os.path.basename(__file__))[0])
+phaseVelocityExponentsMatrix[2][1]=-6
+phasta.updateTransitionPhaseVelocityExponentInput(phaseVelocityExponentsMatrix)
+for i in range(int(t3/phasta.dt)):
+    phasta.step()
+    
+phaseVelocityExponentsMatrix[2][1]=-5
+phasta.updateTransitionPhaseVelocityExponentInput(phaseVelocityExponentsMatrix)
+for i in range(int(t3/phasta.dt)):
+    phasta.step()
+    
+phaseVelocityExponentsMatrix[2][1]=-8
+phasta.updateTransitionPhaseVelocityExponentInput(phaseVelocityExponentsMatrix)
+for i in range(int(t3/phasta.dt)):
+    phasta.step()
+
+for i in range(int(t4/phasta.dt)):
+    phasta.step()
+
+visualize(phasta, t1+t2+3*t3+t4, sectionsAt=[t1, t1+t2, t1+t2+t3, t1+t2+t3+t3], name=os.path.splitext(os.path.basename(__file__))[0])
 

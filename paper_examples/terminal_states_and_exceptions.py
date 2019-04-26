@@ -12,6 +12,7 @@ This tests demonstrates terminal states, and how to reset the system
 import sys
 sys.path.insert(0,'../src')
 import os
+import numpy
 
 #import the phase-state-machine package
 import phasestatemachine 
@@ -25,7 +26,7 @@ predecessors = [
   [2],   
   [0], 
   [1], 
-  [2],   #terminal state 
+  [],   #error state 
 ]
 
 phasta = phasestatemachine.Kernel(
@@ -35,29 +36,37 @@ phasta = phasestatemachine.Kernel(
 )
 
 
+biasMatrix = numpy.zeros((4,4))
+
 t1 = 10.0
 t2 = 0.02
+
 #
-phasta.updateBiases([0,0,0, -1e-7]) 
+biasMatrix[3,:] = -1e-7
+phasta.updateBiases(biasMatrix) 
 for i in range(int(t1/phasta.dt)):
     phasta.step()
 
 #force the system into state 3 with a strong input pulse
-phasta.updateBiases([0,0,0, 1/t2]) 
+biasMatrix[3,:] = 10/t2
+phasta.updateBiases(biasMatrix) 
 for i in range(int(t2/phasta.dt)):
     phasta.step()
-phasta.updateBiases([0,0,0, -1e-7]) 
+biasMatrix[3,:] = 1e-7
+phasta.updateBiases(biasMatrix) 
 
-for i in range(int(t1/phasta.dt)):
+for i in range(int((t1-t2)/phasta.dt)):
     phasta.step()
 
 #such a pulse can also be used to reset the system:
-phasta.updateBiases([1/t2,0,0,0]) 
+biasMatrix[0,:] = 10/t2
+phasta.updateBiases(biasMatrix) 
 for i in range(int(t2/phasta.dt)):
     phasta.step()
-phasta.updateBiases([0,0,0, -1e-7]) 
+biasMatrix[0,:] = 0
+phasta.updateBiases(biasMatrix) 
 
-for i in range(int(t1/phasta.dt)):
+for i in range(int((t1-t2)/phasta.dt)):
     phasta.step()
 
-visualize(phasta, t1+t2+t1+t2+t1, sectionsAt=[t1, t1+t2+t1], name=os.path.splitext(os.path.basename(__file__))[0])
+visualize(phasta, t1+t1+t1, sectionsAt=[t1, t1+t1], name=os.path.splitext(os.path.basename(__file__))[0])
