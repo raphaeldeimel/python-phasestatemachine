@@ -46,7 +46,7 @@ phasta = phasestatemachine.Kernel(
 endtime = 50.0
 
 #Variation: negatively bias transition towards states 2-4 to block transition from state 1:
-#phasta.updateBiases([0, 1*epsilon, 0, 0]) 
+#phasta.updateTransitionTriggerInput([0, 1*epsilon, 0, 0]) 
 
 Gamma = numpy.array([
 [   0, 1e-9, 0, 1e-9 ],
@@ -64,7 +64,7 @@ for i in range(int(endtime/phasta.dt)):
     Gamma[1,2] = 3 * numpy.random.normal(scale=noiseScale)
     Gamma[3,2] = 1* numpy.random.normal(scale=noiseScale)
     bias = numpy.dot(Gamma, phasta.statevector)
-    phasta.updateBiases(Gamma)
+    phasta.updateTransitionTriggerInput(Gamma)
     phasta.step()
 
 visualize(phasta, endtime, name=os.path.splitext(os.path.basename(__file__))[0], clipActivations=0.05)

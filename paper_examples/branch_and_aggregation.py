@@ -37,7 +37,7 @@ phasta = phasestatemachine.Kernel(
 import collections
 bias = collections.deque([0.0]*16)
 bias[0] = 1e-4
-phasta.updateBiases([1e-4] + list(bias) + [0.0]) #
+phasta.updateTransitionTriggerInput([1e-4] + list(bias) + [0.0]) #
 endtime = 34.0
 #run the kernel for some time:
 triggered=False
@@ -46,8 +46,8 @@ for i in range(int(endtime/phasta.dt)):
     if phasta.statevector[-1] > 0.9 and not triggered:
         triggered = True
         bias.rotate(1)
-        phasta.updateBiases([1e-4] + list(bias) + [0.0])
+        phasta.updateTransitionTriggerInput([1e-4] + list(bias) + [0.0])
     elif phasta.statevector[0] > 0.9:
         triggered = False
 
-visualize(phasta, endtime, name=os.path.splitext(os.path.basename(__file__))[0],cullSteps=1)
+visualize(phasta, endtime, name=os.path.splitext(os.path.basename(__file__))[0])
