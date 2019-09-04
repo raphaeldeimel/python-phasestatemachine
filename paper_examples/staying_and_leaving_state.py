@@ -41,9 +41,9 @@ t1 = 5.0
 t2 = 5.0
 
 #negatively bias transition towards state 2 to block transition from state 1:
-phasta.updateTransitionTriggerInput([0.0, 0.0, -1e-7]) 
+phasta.updateBiases([0.0, 0.0, -1e-7]) 
 #alternative: specify the state to block in and project a blocking bias on all successors with the phasta.stateConnectivityMap
-phasta.updateTransitionTriggerInput(  numpy.dot(phasta.stateConnectivity, numpy.array([0.0, -1e-7, 0.0,])) ) 
+phasta.updateBiases(  numpy.dot(phasta.stateConnectivity, numpy.array([0.0, -1e-7, 0.0,])) ) 
 
 #evolve the system for some time
 for i in range(int(t1/phasta.dt)):
@@ -51,13 +51,13 @@ for i in range(int(t1/phasta.dt)):
 
 #un-freeze the state by setting the bias back to non-negative values.
 # positive values will reduce the dwell-time considerably: 
-phasta.updateTransitionTriggerInput([0.0, 0.0, 1e-1]) #
+phasta.updateBiases([0.0, 0.0, 1e-1]) #
 
 t2a = 0.1
 for i in range(int(t2a/phasta.dt)):
     phasta.step()
 
-phasta.updateTransitionTriggerInput([0.0, 0.0, 0.0]) #
+phasta.updateBiases([0.0, 0.0, 0.0]) #
 
 for i in range(int((t2-t2a)/phasta.dt)):
     phasta.step()

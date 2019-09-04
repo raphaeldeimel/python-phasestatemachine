@@ -47,7 +47,7 @@ t3= 2.0
 
 #Variation: negatively bias transition towards states 2-4 to block transition from state 1:
 bias = 1e-3 
-phasta.updateTransitionTriggerInput([bias, bias, bias, bias]) 
+phasta.updateBiases([bias, bias, bias, bias]) 
 
 phaseVelocityExponentsMatrix = [[0., 0.,  0., 0.],
                                 [0., 0., -3., 0.],
@@ -60,17 +60,17 @@ timesToMark = []
 phasta.step(t1)
 
 timesToMark.append(phasta.t)
-phasta.updateTransitionTriggerInput([bias, -100*bias, bias, 100*bias])             
+phasta.updateBiases([bias, -100*bias, bias, 100*bias])             
 phasta.step(tspike)
-phasta.updateTransitionTriggerInput([bias, bias, bias, bias]) 
+phasta.updateBiases([bias, bias, bias, bias]) 
 timesToMark.append(phasta.t)
 
 phasta.step(t2)
 
 timesToMark.append(phasta.t)
-phasta.updateTransitionTriggerInput([bias, -100*bias, bias, 100*bias])             
+phasta.updateBiases([bias, -100*bias, bias, 100*bias])             
 phasta.step(tspike)
-phasta.updateTransitionTriggerInput([bias, bias, bias, bias]) 
+phasta.updateBiases([bias, bias, bias, bias]) 
 timesToMark.append(phasta.t)
 
 phasta.step(t3)

@@ -64,7 +64,7 @@ for i in range(int(endtime/phasta.dt)):
     Gamma[1,2] = 3 * numpy.random.normal(scale=noiseScale)
     Gamma[3,2] = 1* numpy.random.normal(scale=noiseScale)
     bias = numpy.dot(Gamma, phasta.statevector)
-    phasta.updateTransitionTriggerInput(Gamma)
+    phasta.updateBiases(Gamma)
     phasta.step()
 
 visualize(phasta, endtime, name=os.path.splitext(os.path.basename(__file__))[0], clipActivations=0.05)
