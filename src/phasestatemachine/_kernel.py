@@ -60,7 +60,8 @@ def _step(statevector,  #modified in-place
           #parameters:
           numStates, 
           betaInv, 
-          stateConnectivity, 
+          stateConnectivityAbs, 
+          connectivitySignMap,
           rhoZero, 
           rhoDelta,
           alpha, 
@@ -103,8 +104,8 @@ def _step(statevector,  #modified in-place
         #compute which transition biases should be applied right now:
         if emulateHybridAutomaton:
             predecessors = 1.0*(_np.abs(statevector)*betaInv > 0.99)
-            successors =  (_np.dot(stateConnectivity,  predecessors) > 0.5 )
-            notsuccessors =  (_np.dot(stateConnectivity,  predecessors) < 0.5 )
+            successors =  (_np.dot(stateConnectivityAbs,  predecessors) > 0.5 )
+            notsuccessors =  (_np.dot(stateConnectivityAbs,  predecessors) < 0.5 )
             triggervalue_successors[notsuccessors] = 0.0
             noise_statevector = _np.zeros((numStates))
             threshold = 0.1
@@ -136,11 +137,13 @@ def _step(statevector,  #modified in-place
         
         #compute the growth rate adjustment depending on the signs of the state and rho:
         #original SHC behavior: alpha_delta=_np.dot(stateConnectivity*rhoDelta, statesigns*x)
-        stateConnectivityMasked = 1.0 * ( stateConnectivity * statesignsOuterProduct > 0.5) #set rhodelta to zero if state sign flips without us wanting it to
-        rhoDeltaMasked = rhoDelta*(stateConnectivityMasked+stateConnectivityGreedinessAdjustment)
-        
+        isbidirectional = stateConnectivityAbs*stateConnectivityAbs.T
+        isedge = stateConnectivityAbs + stateConnectivityAbs.T - isbidirectional
+        M1 = 0.5*(1+statesignsOuterProduct*connectivitySignMap) #makes sure that attractor works with negative state values too
+        M2 = 0.5*(isedge-isbidirectional + statesignsOuterProduct*(isedge+isbidirectional))  #makes sure that greediness is mapped correctly for negative state values
+        G_masked = M1*stateConnectivityAbs + M2*stateConnectivityGreedinessAdjustment 
         #This is the core computation and time integration of the dynamical system:
-        growth = alpha + _np.dot(rhoZero+rhoDeltaMasked, x_gamma)
+        growth = alpha + _np.dot(rhoZero, x_gamma) +  _np.dot(rhoDelta * G_masked, x_gamma)
         dotstatevector[:] = statevector * growth * kd + mu + biases  #estimate velocity. do not add noise to velocity, promp mixer doesnt like jumps
         statevector[:] = (statevector + dotstatevector*dt + noise_statevector)   #set the new state 
         
@@ -153,7 +156,7 @@ def _step(statevector,  #modified in-place
         statevectorL2 = _np.sum(S2)
         #compute the transition/state activation matrix (Lambda)
         activations = _np.outer(statevector_abs, statevector_abs) * 16 * (statevectorL2) / (S_plus_P**4+statevectorL1**4)
-        activationMatrix[:,:] =  activations * stateConnectivity #function shown in visualization_of_activationfunction.py
+        activationMatrix[:,:] =  activations * stateConnectivityAbs #function shown in visualization_of_activationfunction.py
         _limit(activationMatrix)
         #apply nonlinearity:
         if (nonlinearityParamsLambda[0] != 1.0 or nonlinearityParamsLambda[1] != 1.0 ):
@@ -348,17 +351,21 @@ class Kernel():
         
         reimplements the computation by the SHCtoolbox code  
         """
-        stateConnectivity = _np.zeros((self.numStates, self.numStates))
+        stateConnectivityAbs = _np.zeros((self.numStates, self.numStates))
+        connectivitySignMap =_np.tril(stateConnectivityAbs) - _np.triu(stateConnectivityAbs)   #sign of the transition matrix elements is maintained separately
         for state, successorsPerState in enumerate(self.successors):
             #precedecessorcount = len(predecessorsPerState)
             for successor in successorsPerState:
                 if state == successor: raise ValueError("Cannot set a state ({0}) as successor of itself!".format(state))
-                stateConnectivity[successor,state] = 1 
-        self.stateConnectivity = stateConnectivity
+                stateConnectivityAbs[successor,state] = 1 
+                connectivitySignMap[successor,state] = 1
+                connectivitySignMap[state, successor] = -1
+        self.stateConnectivityAbs = stateConnectivityAbs
+        self.connectivitySignMap = connectivitySignMap
+        print(connectivitySignMap)
         
         #compute a matrix that has ones for states that have a common predecessor, i.e. pairs of states which compete (except for self-competition)
-        T_abs = _np.abs(self.stateConnectivity)
-        self.competingStates = _np.dot(T_abs, T_abs.T) * (1-_np.eye(self.numStates))
+        self.competingStates = _np.dot(self.stateConnectivityAbs, self.stateConnectivityAbs.T) * (1-_np.eye(self.numStates))
         
         #first, fill in the standard values in rhoZero
         # rhoZero = beta^-1 x alpha * (1 - I + alpha^-1 x alpha)
@@ -369,11 +376,10 @@ class Kernel():
         #then fill the rhoDelta:
         rhoDelta = (self.alpha[:,_np.newaxis]*self.betaInv[_np.newaxis,:] / self.nu_term[:,_np.newaxis])
         
-        self.rho =  - rhoZero - rhoDelta * self.stateConnectivity #for reference only
         self.rhoZero = rhoZero
         self.rhoDelta = rhoDelta
-        successorCountInv = 1.0/_np.maximum(_np.sum(stateConnectivity, axis=0)[_np.newaxis,:],1.0)
-        self.BiasMeanBalancingWeights = stateConnectivity * successorCountInv
+        successorCountInv = 1.0/_np.maximum(_np.sum(self.stateConnectivityAbs, axis=0)[_np.newaxis,:],1.0)
+        self.BiasMeanBalancingWeights = self.stateConnectivityAbs * successorCountInv
 
 
     def step(self, until=None, period=None, nr_steps=1):
@@ -424,7 +430,8 @@ class Kernel():
                         #parameters
                         self.numStates, 
                         self.betaInv , 
-                        self.stateConnectivity,
+                        self.stateConnectivityAbs,
+                        self.connectivitySignMap,
                         self.rhoZero, 
                         self.rhoDelta, 
                         self.alpha, 
@@ -521,8 +528,9 @@ class Kernel():
         
         #adjust the strength / reverse direction of the outgoing shc's according to greedinesses:
         greediness_successorstates = _np.clip((0.5*greedinesses-0.5), -1.0, 0.0) # _np.clip(g, -self.nu_term, 0.0)
-        shc_strength = self.stateConnectivity * greediness_successorstates.T
-        self.stateConnectivityGreedinessTransitions = (shc_strength - shc_strength.T)
+        S_relu = 0.5*self.connectivitySignMap + 0.5
+        strength = S_relu * self.stateConnectivityAbs * greediness_successorstates.T #works for (1,-1) transition pairs too
+        self.stateConnectivityGreedinessTransitions = strength - strength.T
 
         #Adjust competition between nodes according to their greediness:
         kappa=0.25
