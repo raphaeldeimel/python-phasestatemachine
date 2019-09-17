@@ -69,6 +69,7 @@ def _step(statevector,  #modified in-place
           nonlinearityParamsLambda,
           nonlinearityParamsPsi,
           stateVectorExponent,
+          speedLimit,
           epsilonLambda,
           emulateHybridAutomaton,  #for HA emulation mode
           triggervalue_successors, #for HA emulation mode, modified in-place
@@ -142,7 +143,10 @@ def _step(statevector,  #modified in-place
         #This is the core computation and time integration of the dynamical system:
         growth = alpha + _np.dot(rhoZero+rhoDeltaMasked, x_gamma)
         dotstatevector[:] = statevector * growth * kd + mu + biases  #estimate velocity. do not add noise to velocity, promp mixer doesnt like jumps
-        statevector[:] = (statevector + dotstatevector*dt + noise_statevector)   #set the new state 
+
+        dotstatevector_L2 = _np.sqrt(_np.sum(dotstatevector**2))
+        velocity_limitfactor = _np.minimum(1.0, speedLimit/(1e-8 + dotstatevector_L2))  #limit speed of the motion in state space to avoid extreme phase velocities that a robot cannot         
+        statevector[:] = (statevector + dotstatevector*dt*velocity_limitfactor + noise_statevector)   #set the new state 
         
         #prepare a normalized state vector for the subsequent operations:
         statevector_abs = _np.abs(statevector)
@@ -248,6 +252,7 @@ class Kernel():
             beta=1.0, 
             dt=1e-2, 
             stateVectorExponent=2.0,
+            speedLimit = _np.inf,
             initialState=0,
             nonlinearityLambda='kumaraswamy1,1',
             nonlinearityPsi='kumaraswamy1,1',
@@ -283,6 +288,7 @@ class Kernel():
         self.maxGreediness=10.0  #maximum factor to allow for increasing decisiveness (mainly to guard against input errors)
         self.reuseNoiseSampleTimes = reuseNoiseSampleTimes
         self.stateVectorExponent =stateVectorExponent
+        self.speedLimit = speedLimit
         if initialState >= self.numStates:
             raise ValueError()
         self.initialState = initialState
@@ -433,6 +439,7 @@ class Kernel():
                         self.nonlinearityParamsLambda,
                         self.nonlinearityParamsPsi,
                         self.stateVectorExponent,
+                        self.speedLimit,
                         self.epsilonLambda,
                         self.emulateHybridAutomaton,
                         self.triggervalue_successors
