@@ -626,14 +626,12 @@ class Kernel():
         This method here effectly "scales" the timeline during transitions
         """
         limits = _np.asarray(limits)
-        if limits.ndim == 2:
-            _np.copyto(self.phaseVelocityExponentInput, limits)
-        elif limits.ndim == 1:
+        if limits.ndim == 1:
             limits = limits[_np.newaxis,:]
         elif limits.ndim == 0:
             limits = limits[_np.newaxis,_np.newaxis]
         self.phaseVelocityExponentInput[:,:] = limits
-        _np.fill_diagonal(self.phaseVelocityExponentInput , 0)
+        #_np.fill_diagonal(self.phaseVelocityExponentInput , 0.0)
 
     def getHistory(self):
         """

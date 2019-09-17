@@ -37,6 +37,7 @@ phasta = phasestatemachine.Kernel(
     numStates=3,
     predecessors=predecessors,
     recordSteps=100000,
+    dt=1e-3
 )
 
 
