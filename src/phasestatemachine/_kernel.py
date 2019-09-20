@@ -362,7 +362,7 @@ class Kernel():
                 connectivitySignMap[state, successor] = -1
         self.stateConnectivityAbs = stateConnectivityAbs
         self.connectivitySignMap = connectivitySignMap
-        print(connectivitySignMap)
+        self.stateConnectivity = self.stateConnectivityAbs
         
         #compute a matrix that has ones for states that have a common predecessor, i.e. pairs of states which compete (except for self-competition)
         self.competingStates = _np.dot(self.stateConnectivityAbs, self.stateConnectivityAbs.T) * (1-_np.eye(self.numStates))
