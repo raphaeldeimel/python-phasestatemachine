@@ -140,7 +140,7 @@ def _step(statevector,  #modified in-place
         isbidirectional = stateConnectivityAbs*stateConnectivityAbs.T
         isedge = stateConnectivityAbs + stateConnectivityAbs.T - isbidirectional
         M1 = 0.5*(1+statesignsOuterProduct*connectivitySignMap) #makes sure that attractor works with negative state values too
-        M2 = 0.5*(isedge-isbidirectional + statesignsOuterProduct*(isedge+isbidirectional))  #makes sure that greediness is mapped correctly for negative state values
+        M2 = 0.5*(1 + statesignsOuterProduct + (statesignsOuterProduct-1) * isbidirectional)  #makes sure that greediness is mapped correctly for negative state values
         G_masked = M1*stateConnectivityAbs + M2*stateConnectivityGreedinessAdjustment 
         #This is the core computation and time integration of the dynamical system:
         growth = alpha + _np.dot(rhoZero, x_gamma) +  _np.dot(rhoDelta * G_masked, x_gamma)
@@ -352,7 +352,7 @@ class Kernel():
         reimplements the computation by the SHCtoolbox code  
         """
         stateConnectivityAbs = _np.zeros((self.numStates, self.numStates))
-        connectivitySignMap =_np.tril(stateConnectivityAbs) - _np.triu(stateConnectivityAbs)   #sign of the transition matrix elements is maintained separately
+        connectivitySignMap =_np.tri(self.numStates, self.numStates) - _np.tri(self.numStates, self.numStates).T
         for state, successorsPerState in enumerate(self.successors):
             #precedecessorcount = len(predecessorsPerState)
             for successor in successorsPerState:
