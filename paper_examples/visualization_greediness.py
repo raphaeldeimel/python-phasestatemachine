@@ -58,7 +58,7 @@ phasta.updateBiases([0.0,0.0,0.0,0.0])
 startpoints = _np.zeros((phasta.numStates, n_streamlines))
 startpoints[1,:] = spread * (_np.sin(_np.linspace(0.0, 0.5*_np.pi, n_streamlines)) + 0.01)
 startpoints[2,:] = spread * (_np.cos(_np.linspace(0.0, 0.5*_np.pi, n_streamlines)) + 0.01)
-startpoints[0,:] = 1.0 - spread**2
+startpoints[0,:] = (1.0 - spread**2)
 
 startpoints = startpoints.T
 
@@ -242,7 +242,7 @@ n_split = 30
 n_split2 = streamline_length-n_split
 
 
-biases = [ [0.0,0.0,0.0,0.0] ] * n_split + [ [0.0, 0.00, 0.0,0.0] ] * n_split2
+biases = [ [0.0,0.0,0.0,0.0] ] * n_split + [ [0.0,0.0,0.0,0.0] ] * n_split2
 
 visualizeWithStreamlines(phasta, "stategreediness_reconsideration_1_05", 
     n_streamlines = n_streamlines, 

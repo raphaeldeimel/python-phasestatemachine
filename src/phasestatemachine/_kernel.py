@@ -36,6 +36,10 @@ def _limit(a):
 def _signfunc(x):
      return 1.0-2*(x<0)
 
+@jit(nopython=True, cache=True)
+def ReLU(x):
+     return 0.5*(_np.abs(x)+x)
+
 # Alternative, differentiable "sign" function
 # Also improves stability of the state's sign
 #@jit(nopython=True)
@@ -54,6 +58,7 @@ def _step(statevector,  #modified in-place
           phaseVelocityExponentInput, 
           BiasMatrix, 
           stateConnectivityGreedinessAdjustment,
+          stateConnectivityCompetingGreedinessAdjustment,
           phasesInput, 
           velocityAdjustmentGain, 
           noise_velocity,
@@ -138,11 +143,11 @@ def _step(statevector,  #modified in-place
         
         #compute the growth rate adjustment depending on the signs of the state and rho:
         #original SHC behavior: alpha_delta=_np.dot(stateConnectivity*rhoDelta, statesigns*x)
-        isbidirectional = stateConnectivityAbs*stateConnectivityAbs.T
-        isedge = stateConnectivityAbs + stateConnectivityAbs.T - isbidirectional
-        M1 = 0.5*(1+statesignsOuterProduct*connectivitySignMap) #makes sure that attractor works with negative state values too
-        M2 = 0.5*(1 + statesignsOuterProduct + (statesignsOuterProduct-1) * isbidirectional)  #makes sure that greediness is mapped correctly for negative state values
-        G_masked = M1*stateConnectivityAbs + M2*stateConnectivityGreedinessAdjustment 
+        isbidirectional = _np.sqrt(stateConnectivityAbs*stateConnectivityAbs.T) 
+        edgecount = stateConnectivityAbs + stateConnectivityAbs.T
+        M1 = ReLU(statesignsOuterProduct*connectivitySignMap) #makes sure that attractor works with negative state values too
+        M2 = (edgecount * ReLU(statesignsOuterProduct) - isbidirectional) * connectivitySignMap
+        G_masked = M1*stateConnectivityAbs + M2*stateConnectivityGreedinessAdjustment + stateConnectivityCompetingGreedinessAdjustment
         #This is the core computation and time integration of the dynamical system:
         growth = alpha + _np.dot(rhoZero, x_gamma) +  _np.dot(rhoDelta * G_masked, x_gamma)
         dotstatevector[:] = statevector * growth * kd + mu + biases  #estimate velocity. do not add noise to velocity, promp mixer doesnt like jumps
@@ -317,6 +322,7 @@ class Kernel():
         self.velocityAdjustmentGain = _np.zeros((self.numStates,self.numStates))  #gain of the control enslaving the given state transition
         self.phaseVelocityExponentInput = _np.zeros((self.numStates,self.numStates))  #contains values that limit transition velocity
         self.stateConnectivityGreedinessAdjustment = _np.zeros((self.numStates,self.numStates)) #contains values that adjust transition greediness
+        self.stateConnectivityCompetingGreedinessAdjustment = _np.zeros((self.numStates,self.numStates)) #contains values that adjust competing transition greediness
         self.stateConnectivityGreedinessTransitions = _np.zeros((self.numStates,self.numStates))
         self.stateConnectivityGreedinessCompetingSuccessors = _np.zeros((self.numStates,self.numStates))
 
@@ -358,7 +364,7 @@ class Kernel():
         reimplements the computation by the SHCtoolbox code  
         """
         stateConnectivityAbs = _np.zeros((self.numStates, self.numStates))
-        connectivitySignMap =_np.tri(self.numStates, self.numStates) - _np.tri(self.numStates, self.numStates).T
+        connectivitySignMap =_np.tri(self.numStates, self.numStates, k=0) - _np.tri(self.numStates, self.numStates, k=-1).T
         for state, successorsPerState in enumerate(self.successors):
             #precedecessorcount = len(predecessorsPerState)
             for successor in successorsPerState:
@@ -418,7 +424,8 @@ class Kernel():
                     self.noiseValidCounter = self.reuseNoiseSampleTimes
                 #low-pass filter input to avoid sudden jumps in velocity
                 self.BiasMatrix += self.inputfilterK * (self.BiasMatrixDesired-self.BiasMatrix) 
-                self.stateConnectivityGreedinessAdjustment += self.inputfilterK * (self.stateConnectivityGreedinessTransitions + self.stateConnectivityGreedinessCompetingSuccessors - self.stateConnectivityGreedinessAdjustment)
+                self.stateConnectivityGreedinessAdjustment += self.inputfilterK * (self.stateConnectivityGreedinessTransitions - self.stateConnectivityGreedinessAdjustment)
+                self.stateConnectivityCompetingGreedinessAdjustment += self.inputfilterK * (self.stateConnectivityGreedinessCompetingSuccessors -self.stateConnectivityCompetingGreedinessAdjustment)
                 
                 _step(  #arrays modified in-place:
                         self.statevector, 
@@ -430,6 +437,7 @@ class Kernel():
                         self.phaseVelocityExponentInput, 
                         self.BiasMatrix,
                         self.stateConnectivityGreedinessAdjustment,
+                        self.stateConnectivityCompetingGreedinessAdjustment,
                         self.phasesInput, 
                         self.velocityAdjustmentGain, 
                         self.noise_velocity,
@@ -535,13 +543,14 @@ class Kernel():
         
         #adjust the strength / reverse direction of the outgoing shc's according to greedinesses:
         greediness_successorstates = _np.clip((0.5*greedinesses-0.5), -1.0, 0.0) # _np.clip(g, -self.nu_term, 0.0)
-        S_relu = 0.5*self.connectivitySignMap + 0.5
-        strength = S_relu * self.stateConnectivityAbs * greediness_successorstates.T #works for (1,-1) transition pairs too
-        self.stateConnectivityGreedinessTransitions = strength - strength.T
+        strength = self.stateConnectivityAbs * greediness_successorstates.T #works for (1,-1) transition pairs too
+        self.stateConnectivityGreedinessTransitions = strength + strength.T
 
         #Adjust competition between nodes according to their greediness:
-        kappa=0.25
-        self.stateConnectivityGreedinessCompetingSuccessors = self.competingStates * 0.5*(1-(1.+kappa)*greedinesses+kappa*greedinesses.T)
+        kappa=0.
+#        self.stateConnectivityGreedinessCompetingSuccessors = self.competingStates * 0.5*(1-(1.+kappa)*greedinesses+kappa*greedinesses.T)
+        self.stateConnectivityGreedinessCompetingSuccessors = self.competingStates * 0.5*(1-greedinesses)
+
 
 
     def updateCompetingTransitionGreediness(self,greedinesses):

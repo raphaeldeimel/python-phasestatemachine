@@ -127,14 +127,14 @@ phasta.rhoDelta[0,1] =  phasta.rhoDelta[1,0]
 
 plot_streamlines_2d(phasta, name="pos1")
 
-phasta.updateGreediness(0.5)
-plot_streamlines_2d(phasta, name="pos05")
+phasta.updateGreediness(0.3)
+plot_streamlines_2d(phasta, name="pos03")
 
 phasta.updateGreediness(0.0)
 plot_streamlines_2d(phasta, name="zero")
 
-phasta.updateGreediness(-0.5)
-plot_streamlines_2d(phasta, name="neg05")
+phasta.updateGreediness(-0.3)
+plot_streamlines_2d(phasta, name="neg03")
 
 phasta.updateGreediness(-1.0)
 plot_streamlines_2d(phasta, name="neg1")
