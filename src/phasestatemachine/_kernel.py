@@ -66,7 +66,9 @@ def _step(statevector,  #modified in-place
           numStates, 
           betaInv, 
           stateConnectivityAbs, 
-          connectivitySignMap,
+          stateConnectivitySignMap,
+          stateConnectivityIsBidirectional,
+          stateConnectivityNrEdges,
           rhoZero, 
           rhoDelta,
           alpha, 
@@ -143,13 +145,11 @@ def _step(statevector,  #modified in-place
         
         #compute the growth rate adjustment depending on the signs of the state and rho:
         #original SHC behavior: alpha_delta=_np.dot(stateConnectivity*rhoDelta, statesigns*x)
-        isbidirectional = _np.sqrt(stateConnectivityAbs*stateConnectivityAbs.T) 
-        edgecount = stateConnectivityAbs + stateConnectivityAbs.T
-        M1 = ReLU(statesignsOuterProduct*connectivitySignMap) #makes sure that attractor works with negative state values too
-        M2 = (edgecount * ReLU(statesignsOuterProduct) - isbidirectional) * connectivitySignMap
+        M1 = ReLU(statesignsOuterProduct*stateConnectivitySignMap) #makes sure that attractor works with negative state values too
+        M2 = (stateConnectivityNrEdges * ReLU(statesignsOuterProduct) - stateConnectivityIsBidirectional) * stateConnectivitySignMap
         G_masked = M1*stateConnectivityAbs + M2*stateConnectivityGreedinessAdjustment + stateConnectivityCompetingGreedinessAdjustment
         #This is the core computation and time integration of the dynamical system:
-        growth = alpha + _np.dot(rhoZero, x_gamma) +  _np.dot(rhoDelta * G_masked, x_gamma)
+        growth = alpha + _np.dot(rhoZero, x_gamma) + _np.dot(rhoDelta * G_masked, x_gamma)
         dotstatevector[:] = statevector * growth * kd + mu + biases  #estimate velocity. do not add noise to velocity, promp mixer doesnt like jumps
 
         dotstatevector_L2 = _np.sqrt(_np.sum(dotstatevector**2))
@@ -364,19 +364,24 @@ class Kernel():
         reimplements the computation by the SHCtoolbox code  
         """
         stateConnectivityAbs = _np.zeros((self.numStates, self.numStates))
-        connectivitySignMap =_np.tri(self.numStates, self.numStates, k=0) - _np.tri(self.numStates, self.numStates, k=-1).T
+        stateConnectivitySignMap =_np.tri(self.numStates, self.numStates, k=0) - _np.tri(self.numStates, self.numStates, k=-1).T
         for state, successorsPerState in enumerate(self.successors):
             #precedecessorcount = len(predecessorsPerState)
             for successor in successorsPerState:
                 if state == successor: raise ValueError("Cannot set a state ({0}) as successor of itself!".format(state))
                 stateConnectivityAbs[successor,state] = 1 
-                connectivitySignMap[successor,state] = 1
-                connectivitySignMap[state, successor] = -1
+                stateConnectivitySignMap[successor,state] = 1
+                stateConnectivitySignMap[state, successor] = -1
         self.stateConnectivityAbs = stateConnectivityAbs
-        self.connectivitySignMap = connectivitySignMap
+        self.stateConnectivitySignMap = stateConnectivitySignMap
+        #precompute some things:
+        self.stateConnectivityIsBidirectional =  _np.sqrt(self.stateConnectivityAbs * self.stateConnectivityAbs.T) 
+        self.stateConnectivityNrEdges = stateConnectivityAbs + stateConnectivityAbs.T
+
         self.stateConnectivity = self.stateConnectivityAbs
         
         #compute a matrix that has ones for states that have a common predecessor, i.e. pairs of states which compete (except for self-competition)
+        self.connectivitySigned = self.stateConnectivitySignMap*self.stateConnectivityAbs
         self.competingStates = _np.dot(self.stateConnectivityAbs, self.stateConnectivityAbs.T) * (1-_np.eye(self.numStates))
         
         #first, fill in the standard values in rhoZero
@@ -445,7 +450,9 @@ class Kernel():
                         self.numStates, 
                         self.betaInv , 
                         self.stateConnectivityAbs,
-                        self.connectivitySignMap,
+                        self.stateConnectivitySignMap,
+                        self.stateConnectivityIsBidirectional,
+                        self.stateConnectivityNrEdges,
                         self.rhoZero, 
                         self.rhoDelta, 
                         self.alpha, 
@@ -550,7 +557,7 @@ class Kernel():
         kappa=0.
 #        self.stateConnectivityGreedinessCompetingSuccessors = self.competingStates * 0.5*(1-(1.+kappa)*greedinesses+kappa*greedinesses.T)
         self.stateConnectivityGreedinessCompetingSuccessors = self.competingStates * 0.5*(1-greedinesses)
-
+        
 
 
     def updateCompetingTransitionGreediness(self,greedinesses):
