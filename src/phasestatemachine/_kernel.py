@@ -140,16 +140,16 @@ def _step(statevector,  #modified in-place
 
 
         #stateVectorExponent=1  #straight channels: |x|  (original SHC by Horchler/Rabinovich)
-        #stateVectorExponent=2  #spherical channels: |x|**2
+        #stateVectorExponent=2  #spherical channels: |x|**2 (default for phasta)
         x_gamma = (statevector*statesigns)**stateVectorExponent
-        
-        #compute the growth rate adjustment depending on the signs of the state and rho:
-        #original SHC behavior: alpha_delta=_np.dot(stateConnectivity*rhoDelta, statesigns*x)
-        M1 = ReLU(statesignsOuterProduct*stateConnectivitySignMap) #makes sure that attractor works with negative state values too
-        M2 = (stateConnectivityNrEdges * ReLU(statesignsOuterProduct) - stateConnectivityIsBidirectional) * stateConnectivitySignMap
-        G_masked = M1*stateConnectivityAbs + M2*stateConnectivityGreedinessAdjustment + stateConnectivityCompetingGreedinessAdjustment
+                        
+        #Compute a mask that ensures the attractor works with negative state values too, that the transition's "sign" is observed, and that unidirectional edges do not accidentally change between positive and negative state values
+        M_T = ReLU(statesignsOuterProduct*stateConnectivitySignMap) 
+        #Appropriate signs for transition-related greediness adjustment, depending on whether a graph edge is bidirectional or not:
+        TransitionGreedinessAdjustmentSign = (stateConnectivityNrEdges * ReLU(statesignsOuterProduct) - stateConnectivityIsBidirectional) * stateConnectivitySignMap 
+        T_G = M_T*stateConnectivityAbs + TransitionGreedinessAdjustmentSign*stateConnectivityGreedinessAdjustment + stateConnectivityCompetingGreedinessAdjustment
         #This is the core computation and time integration of the dynamical system:
-        growth = alpha + _np.dot(rhoZero, x_gamma) + _np.dot(rhoDelta * G_masked, x_gamma)
+        growth = alpha + _np.dot(rhoZero, x_gamma) + _np.dot(rhoDelta * T_G, x_gamma)
         dotstatevector[:] = statevector * growth * kd + mu + biases  #estimate velocity. do not add noise to velocity, promp mixer doesnt like jumps
 
         dotstatevector_L2 = _np.sqrt(_np.sum(dotstatevector**2))

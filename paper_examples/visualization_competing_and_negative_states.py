@@ -59,10 +59,12 @@ greedinesses_totest = ([1.0,0.17,0.17,1.0],[1.0,3.2,0.37,1.0])
 
 for i, greedinesses in enumerate(greedinesses_totest):
   for name, sign0, sign1, sign2 in combinations:
-    phasta.connectivitySignMap[1,0] = sign1*sign0
-    phasta.connectivitySignMap[2,0] = sign2*sign0
-    phasta.connectivitySignMap[0,1] =  -phasta.connectivitySignMap[1,0]
-    phasta.connectivitySignMap[0,2] =  -phasta.connectivitySignMap[2,0]
+  
+    #enforce certain transition signs:
+    phasta.stateConnectivitySignMap[1,0] = sign1*sign0
+    phasta.stateConnectivitySignMap[2,0] = sign2*sign0
+    phasta.stateConnectivitySignMap[0,1] =  -phasta.stateConnectivitySignMap[1,0]
+    phasta.stateConnectivitySignMap[0,2] =  -phasta.stateConnectivitySignMap[2,0]
     
 
 
@@ -104,8 +106,8 @@ for i, greedinesses in enumerate(greedinesses_totest):
 
 
     print(name)
-    print(phasta.stateConnectivityGreedinessAdjustment)
-    print(phasta.stateConnectivityCompetingGreedinessAdjustment)
+    #print(phasta.stateConnectivityGreedinessAdjustment)
+    #print(phasta.stateConnectivityCompetingGreedinessAdjustment)
 #    print(phasta.connectivitySignMap)
 #    print(phasta.stateConnectivityAbs*phasta.stateConnectivityAbs.T)
 #    print(phasta.competingStates)
