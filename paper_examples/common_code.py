@@ -157,7 +157,7 @@ def visualizeWithStreamlines(
     ax.set_ylabel('x1')
     ax.set_xlabel('x0')
     plt.savefig('figures/{0}.pdf'.format(name), bbox_inches='tight')
-    #plt.savefig('figures/{0}.jpg'.format(name), bbox_inches='tight')
+    plt.savefig('figures/{0}.png'.format(name), bbox_inches='tight',dpi=600)
     return ax
 
 
