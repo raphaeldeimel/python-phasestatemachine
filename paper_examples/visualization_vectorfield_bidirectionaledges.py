@@ -116,7 +116,7 @@ phasta = phasestatemachine.Kernel(
     recordSteps = 10000,
 )
 
-phasta.rhoDelta[0,1] =  phasta.rhoDelta[1,0]
+#phasta.rhoDelta[0,1] =  phasta.rhoDelta[1,0]
 #phasta.stateConnectivity[0,1] = 1
 #phasta.stateConnectivity[1,0] = -1
 
