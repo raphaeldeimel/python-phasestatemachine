@@ -105,8 +105,7 @@ def _step(statevector,  #modified in-place
         mu = correctiveActionPredecessor - correctiveActionSuccessor
 
         statevector_abs = _np.abs(statevector)
-#        biases = _np.dot(BiasMatrix, statevector_abs) * (1-statevector_abs)
-        biases = _np.dot(BiasMatrix * _np.outer(1-statevector_abs,statevector_abs), statevector)
+        biases = _np.dot(BiasMatrix * stateConnectivitySignMap * _np.outer(1-statevector_abs,statevector_abs), statevector)
         noise_statevector = noise_velocity * dt
         
         #compute which transition biases should be applied right now:
