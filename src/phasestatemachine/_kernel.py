@@ -171,7 +171,7 @@ def _step(statevector,  #modified in-place
             activationMatrix[:,:] = 1.0-(1.0-activationMatrix**nonlinearityParamsLambda[0])**nonlinearityParamsLambda[1] #Kumaraswamy CDF
         
         #compute the state activation and put it into the diagonal of Lambda:
-        residual = 1.0-_np.sum(activationMatrix)
+        residual = max(0.0, 1.0 - _np.sum(activationMatrix))
         stateactivation_normalized = S2/ _np.sum(S2) 
         for i in range(numStates):
             activationMatrix[i,i] =  stateactivation_normalized[i,0] * residual
