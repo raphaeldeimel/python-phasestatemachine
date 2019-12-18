@@ -163,7 +163,7 @@ def _step(statevector,  #modified in-place
         statevectorL1 = _np.sum(S)
         statevectorL2 = _np.sum(S2)
         #compute the transition/state activation matrix (Lambda)
-        activations = _np.outer(statevector_abs, statevector_abs) * 16 * (statevectorL2) / (S_plus_P**4+statevectorL1**4)
+        activations = stateConnectivitySignMap * _np.outer(statevector, statevector) * 16 * (statevectorL2) / (S_plus_P**4+statevectorL1**4)
         activationMatrix[:,:] =  activations * stateConnectivityAbs #function shown in visualization_of_activationfunction.py
         _limit(activationMatrix)
         #apply nonlinearity:
