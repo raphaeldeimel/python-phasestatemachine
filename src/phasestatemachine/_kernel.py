@@ -127,7 +127,7 @@ def _step(statevector,  #modified in-place
                 
                 if triggervalue_successors[chosensuccessor] < 1e5:
                     triggervalue_successors[ chosensuccessor ] = 1e6
-                    print( chosensuccessor)
+                    #print(chosensuccessor)
                     noise_statevector[chosensuccessor] = 1.0
             else:
                  triggervalue_successors[:] += biases * dt + noise_velocity
