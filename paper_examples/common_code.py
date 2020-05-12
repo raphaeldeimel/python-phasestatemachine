@@ -17,6 +17,8 @@ from matplotlib.collections import LineCollection
 import matplotlib 
 from mpl_toolkits.mplot3d import Axes3D
 
+_np.set_printoptions(precision=3, suppress=True)
+
 
 def plotLineWithVariableWidth(axis, x,y,s, color=None):
     points = _np.array([x, y]).T.reshape(-1, 1, 2)
