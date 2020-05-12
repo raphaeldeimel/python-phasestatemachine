@@ -46,48 +46,50 @@ def ReLU(x):
 #def _signfunc(x, epsilon=1e-3):
 #     return _np.tanh(x/epsilon)
 
-_np.set_printoptions(precision=3, suppress=True)
+#_np.set_printoptions(precision=3, suppress=True)
 
 @jit(nopython=True, cache=True)
-def _step(statevector,  #modified in-place
-          dotstatevector, #modified in-place 
-          activationMatrix, #modified in-place 
-          phasesMatrix,  #modified in-place
-          phaseVelocitiesMatrix, #modified in-place 
+def _step(statevector,                      #main state vector.  Input and output, modified in-place
+          #outputs, modified in place:
+          dotstatevector,                   #velocity of main state vector
+          activationMatrix,                 #Activation for each potential state and transition
+          phasesMatrix,                     #Phases for each transition
+          phaseVelocitiesMatrix,            #Derivative of phases for each transition 
           #inputs:
-          phaseVelocityExponentInput, 
-          BiasMatrix, 
-          stateConnectivityGreedinessAdjustment,
-          stateConnectivityCompetingGreedinessAdjustment,
-          phasesInput, 
-          velocityAdjustmentGain, 
-          noise_velocity,
+          phaseVelocityExponentInput,       #input to modify velocity of each transition individually (exponential scale, basis 2)
+          BiasMatrix,                       #input to depart / avert departure from states
+          stateConnectivityGreedinessAdjustment,  #input to modify how strong a successor state pulls the system towards itself, relative to the predecessor state  
+          stateConnectivityCompetingGreedinessAdjustment, #input to adjust greediness in between compeeting successor states
+          phasesInput,                      # phase target in case a transition is enslaved to an external phase 
+          velocityAdjustmentGain,           # gain related to enslaving phase
+          noise_velocity,                   # vector that gets added to state velocity (usually in order to inject some base noise) 
           #parameters:
-          numStates, 
-          betaInv, 
-          stateConnectivityAbs, 
-          stateConnectivitySignMap,
-          stateConnectivityIsBidirectional,
-          stateConnectivityNrEdges,
-          rhoZero, 
-          rhoDelta,
-          alpha, 
-          dt, 
-          dtInv, 
-          nonlinearityParamsLambda,
-          nonlinearityParamsPsi,
-          stateVectorExponent,
-          speedLimit,
-          epsilonLambda,
-          emulateHybridAutomaton,  #for HA emulation mode
-          triggervalue_successors, #for HA emulation mode, modified in-place
+          numStates,                        #number of states / dimensions
+          betaInv,                          #precomputed from beta parameter (state locations / scale)
+          stateConnectivityAbs,             #precomputed from state graph
+          stateConnectivitySignMap,         #precomputed from state graph
+          stateConnectivityIsBidirectional, #precomputed from state graph
+          stateConnectivityNrEdges,         #precomputed from state graph 
+          rhoZero,                          #coupling values for creating discrete states
+          rhoDelta,                         #coupling values for creating stable heteroclinic channels
+          alpha,                            #growth rate of states, determines speed of transitioning
+          dt,                               # time step duration in seconds
+          dtInv,                            #precomputed from dt
+          nonlinearityParamsLambda,         #Kumaraswamy distribution parameters to modify gradualness of activation            
+          nonlinearityParamsPsi,            #Kumaraswamy distribution parameters to modify gradualness of phase progress
+          stateVectorExponent,              #modifies the bending of heteroclinic channels
+          speedLimit,                       #safety limit to state velocity
+          epsilonLambda,                    #determines the region of zero activation around the coordinates axes 
+          #for comparative study:
+          emulateHybridAutomaton,           #set this to true to hack phasta into acting like a discrete state graph / hybrid automaton
+          triggervalue_successors,          #for HA emulation mode, modified in-place
           ):
         """
         Core phase-state machine computation.
 
         Written as a function in order to be able to optimize it with numba
         
-        the function modifies several arguments (numpy arrays) in place.
+        Note: The function modifies several arguments (numpy arrays) in place.
         """
         #compute adjustment to the instantaneously effective growth factor
         scaledactivation = activationMatrix * (1.0 / max(1.0, _np.sum(activationMatrix)))
@@ -105,10 +107,11 @@ def _step(statevector,  #modified in-place
         mu = correctiveActionPredecessor - correctiveActionSuccessor
 
         statevector_abs = _np.abs(statevector)
+        #adjust signs of the bias values depending on the transition direction:
         biases = _np.dot(BiasMatrix * stateConnectivitySignMap * _np.outer(1-statevector_abs,statevector_abs), statevector)
         noise_statevector = noise_velocity * dt
         
-        #compute which transition biases should be applied right now:
+        #If requested, decide whether to start a transition using a threshold, and stick to that decision no matter what until the transition finishes
         if emulateHybridAutomaton:
             predecessors = 1.0*(_np.abs(statevector)*betaInv > 0.99)
             successors =  (_np.dot(stateConnectivityAbs,  predecessors) > 0.5 )
@@ -132,10 +135,10 @@ def _step(statevector,  #modified in-place
             else:
                  triggervalue_successors[:] += biases * dt + noise_velocity
         
-        statevector[:] = statevector
+        statevector[:] = statevector #for numba
 
         statesigns = _signfunc(statevector)
-        statesignsOuterProduct = _np.outer(statesigns,statesigns)
+        statesignsOuterProduct = _np.outer(statesigns,statesigns) #precompute this, as we need it several times
 
 
         #stateVectorExponent=1  #straight channels: |x|  (original SHC by Horchler/Rabinovich)
@@ -143,10 +146,13 @@ def _step(statevector,  #modified in-place
         x_gamma = (statevector*statesigns)**stateVectorExponent
                         
         #Compute a mask that ensures the attractor works with negative state values too, that the transition's "sign" is observed, and that unidirectional edges do not accidentally change between positive and negative state values
+        #the computation is formulated such that only algebraic and continuous functions (e.g. ReLu) are used
         M_T = ReLU(statesignsOuterProduct*stateConnectivitySignMap) 
         #Appropriate signs for transition-related greediness adjustment, depending on whether a graph edge is bidirectional or not:
         TransitionGreedinessAdjustmentSign = (stateConnectivityNrEdges * ReLU(statesignsOuterProduct) - stateConnectivityIsBidirectional) * stateConnectivitySignMap 
+        #sum everything into a transition/greedinesses matrix (T+G):
         T_G = M_T*stateConnectivityAbs + TransitionGreedinessAdjustmentSign*stateConnectivityGreedinessAdjustment + stateConnectivityCompetingGreedinessAdjustment
+
         #This is the core computation and time integration of the dynamical system:
         growth = alpha + _np.dot(rhoZero, x_gamma) + _np.dot(rhoDelta * T_G, x_gamma)
         dotstatevector[:] = statevector * growth * kd + mu + biases  #estimate velocity. do not add noise to velocity, promp mixer doesnt like jumps
